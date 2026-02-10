@@ -1,0 +1,1676 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema de Mantenimiento Preventivo Bimestral 2026 - Distribución Equilibrada</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary: #1a237e;
+            --secondary: #0d47a1;
+            --accent: #00bcd4;
+            --success: #4caf50;
+            --warning: #ff9800;
+            --danger: #f44336;
+            --pending: #9e9e9e;
+            --bg-dark: #0f172a;
+            --bg-card: #1e293b;
+            --text-primary: #f8fafc;
+            --text-secondary: #94a3b8;
+            --border: #334155;
+            --walter: #fbbf24;
+            --adrian: #818cf8;
+            --terrazas: #ff5722;
+        }
+
+        body {
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            background: linear-gradient(135deg, var(--bg-dark) 0%, #1e1b4b 100%);
+            color: var(--text-primary);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        .header {
+            background: rgba(15, 23, 42, 0.95);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid var(--border);
+            padding: 1.5rem 2rem;
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+
+        .header h1 {
+            font-size: 1.8rem;
+            background: linear-gradient(135deg, var(--accent), #60a5fa);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            font-weight: 700;
+        }
+
+        .header-controls {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 0.5rem;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.9rem;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--secondary), var(--primary));
+            color: white;
+            box-shadow: 0 4px 15px rgba(13, 71, 161, 0.4);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(13, 71, 161, 0.6);
+        }
+
+        .btn-toggle {
+            background: var(--bg-card);
+            color: var(--text-primary);
+            border: 1px solid var(--border);
+        }
+
+        .btn-toggle:hover {
+            background: var(--border);
+        }
+
+        /* Dashboard */
+        .dashboard {
+            padding: 2rem;
+            background: rgba(30, 41, 59, 0.5);
+            border-bottom: 1px solid var(--border);
+            transition: all 0.3s ease;
+            overflow: hidden;
+        }
+
+        .dashboard.minimized {
+            max-height: 60px;
+            padding: 0.5rem 2rem;
+        }
+
+        .dashboard-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+            cursor: pointer;
+        }
+
+        .dashboard.minimized .dashboard-content {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .stat-card {
+            background: linear-gradient(145deg, rgba(30, 41, 59, 0.9), rgba(15, 23, 42, 0.9));
+            border: 1px solid var(--border);
+            border-radius: 1rem;
+            padding: 1.5rem;
+            position: relative;
+            overflow: hidden;
+            transition: transform 0.3s ease;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-5px);
+            border-color: var(--accent);
+        }
+
+        .stat-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 4px;
+            background: linear-gradient(90deg, var(--accent), var(--secondary));
+        }
+
+        .stat-label {
+            color: var(--text-secondary);
+            font-size: 0.875rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 0.5rem;
+        }
+
+        .stat-value {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            line-height: 1;
+            margin-bottom: 0.5rem;
+        }
+
+        .charts-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 1.5rem;
+        }
+
+        .chart-container {
+            background: rgba(30, 41, 59, 0.8);
+            border: 1px solid var(--border);
+            border-radius: 1rem;
+            padding: 1.5rem;
+        }
+
+        .chart-title {
+            font-size: 1.1rem;
+            margin-bottom: 1rem;
+            color: var(--accent);
+            font-weight: 600;
+        }
+
+        /* Bimestre Section */
+        .bimestre-section {
+            padding: 2rem;
+            border-bottom: 2px solid var(--border);
+            animation: fadeIn 0.5s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .bimestre-header {
+            background: linear-gradient(135deg, rgba(30, 41, 59, 0.9), rgba(15, 23, 42, 0.9));
+            border: 1px solid var(--border);
+            border-radius: 1rem;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+
+        .bimestre-title {
+            font-size: 1.8rem;
+            color: var(--accent);
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .bimestre-subtitle {
+            color: var(--text-secondary);
+            font-size: 1rem;
+        }
+
+        .tech-legend {
+            display: flex;
+            gap: 2rem;
+            font-size: 0.9rem;
+        }
+
+        .tech-badge {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem 1rem;
+            border-radius: 0.5rem;
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .tech-walter { border-left: 4px solid var(--walter); }
+        .tech-adrian { border-left: 4px solid var(--adrian); }
+        .tech-terrazas { border-left: 4px solid var(--terrazas); }
+
+        /* Special Notice */
+        .special-notice {
+            background: linear-gradient(135deg, rgba(255, 87, 34, 0.2), rgba(255, 87, 34, 0.05));
+            border: 1px solid var(--terrazas);
+            border-radius: 0.75rem;
+            padding: 1rem;
+            margin-bottom: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            color: var(--terrazas);
+        }
+
+        .special-notice-icon {
+            font-size: 1.5rem;
+        }
+
+        .special-notice-text {
+            font-size: 0.9rem;
+        }
+
+        .special-notice-text strong {
+            color: var(--text-primary);
+        }
+
+        /* Two Months Grid */
+        .months-comparison {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2rem;
+            margin-bottom: 2rem;
+        }
+
+        .month-column {
+            background: rgba(30, 41, 59, 0.6);
+            border: 1px solid var(--border);
+            border-radius: 1rem;
+            padding: 1.5rem;
+        }
+
+        .month-title {
+            font-size: 1.4rem;
+            color: var(--text-primary);
+            margin-bottom: 1rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 2px solid var(--accent);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .month-summary {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            background: rgba(0, 188, 212, 0.1);
+            padding: 0.25rem 0.75rem;
+            border-radius: 0.25rem;
+        }
+
+        /* Week Grid */
+        .week-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1rem;
+        }
+
+        .day-card {
+            background: linear-gradient(145deg, rgba(30, 41, 59, 0.9), rgba(15, 23, 42, 0.9));
+            border: 1px solid var(--border);
+            border-radius: 0.75rem;
+            padding: 1rem;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .day-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            border-color: var(--accent);
+        }
+
+        .day-card.critical {
+            border-left: 4px solid var(--danger);
+        }
+
+        .day-card.terrazas-special {
+            border: 2px solid var(--terrazas);
+            background: linear-gradient(145deg, rgba(255, 87, 34, 0.1), rgba(15, 23, 42, 0.9));
+        }
+
+        .day-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.75rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .day-title {
+            font-weight: 600;
+            color: var(--text-primary);
+            font-size: 0.95rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .day-date {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            background: rgba(0, 188, 212, 0.1);
+            padding: 0.25rem 0.5rem;
+            border-radius: 0.25rem;
+        }
+
+        .sunday-badge {
+            background: var(--terrazas);
+            color: white;
+            padding: 0.2rem 0.5rem;
+            border-radius: 0.25rem;
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .terrazas-once-badge {
+            background: var(--success);
+            color: white;
+            padding: 0.2rem 0.5rem;
+            border-radius: 0.25rem;
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .shift-block {
+            margin-bottom: 0.75rem;
+            padding: 0.75rem;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 0.5rem;
+            border-left: 3px solid transparent;
+        }
+
+        .shift-block.morning {
+            border-left-color: var(--walter);
+            background: rgba(251, 191, 36, 0.05);
+        }
+
+        .shift-block.night {
+            border-left-color: var(--adrian);
+            background: rgba(129, 140, 248, 0.05);
+        }
+
+        .shift-block.terrazas {
+            border-left-color: var(--terrazas);
+            background: rgba(255, 87, 34, 0.1);
+            border: 1px solid rgba(255, 87, 34, 0.3);
+        }
+
+        .shift-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.5rem;
+            font-size: 0.85rem;
+        }
+
+        .tech-name {
+            font-weight: 600;
+        }
+
+        .tech-walter-text { color: var(--walter); }
+        .tech-adrian-text { color: var(--adrian); }
+        .tech-terrazas-text { color: var(--terrazas); }
+
+        .shift-time {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+        }
+
+        .equipment-list {
+            display: flex;
+            flex-direction: column;
+            gap: 0.4rem;
+        }
+
+        .equipment-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.4rem 0.6rem;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 0.25rem;
+            font-size: 0.8rem;
+            transition: all 0.2s;
+        }
+
+        .equipment-item:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .equipment-name {
+            color: var(--text-secondary);
+            display: flex;
+            align-items: center;
+            gap: 0.3rem;
+        }
+
+        .equipment-location {
+            font-size: 0.7rem;
+            color: var(--accent);
+            background: rgba(0, 188, 212, 0.1);
+            padding: 0.1rem 0.4rem;
+            border-radius: 0.25rem;
+        }
+
+        .critical-badge {
+            color: var(--danger);
+            font-size: 0.9rem;
+        }
+
+        .time-badge {
+            font-size: 0.7rem;
+            color: var(--warning);
+            margin-left: 0.3rem;
+        }
+
+        /* Status Toggle */
+        .status-toggle {
+            padding: 0.25rem 0.75rem;
+            border: none;
+            border-radius: 0.25rem;
+            font-size: 0.75rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .status-pending {
+            background: var(--pending);
+            color: white;
+        }
+
+        .status-progress {
+            background: var(--warning);
+            color: black;
+        }
+
+        .status-completed {
+            background: var(--success);
+            color: white;
+        }
+
+        .status-toggle:hover {
+            transform: scale(1.05);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+        }
+
+        /* Equipment Rotation Info */
+        .rotation-info {
+            background: rgba(30, 41, 59, 0.8);
+            border: 1px solid var(--border);
+            border-radius: 0.75rem;
+            padding: 1rem;
+            margin-top: 1rem;
+            font-size: 0.85rem;
+        }
+
+        .rotation-title {
+            color: var(--accent);
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+        }
+
+        .rotation-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+        }
+
+        .rotation-item {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 0.25rem 0.5rem;
+            border-radius: 0.25rem;
+            color: var(--text-secondary);
+        }
+
+        .rotation-stats {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1rem;
+            margin-top: 0.5rem;
+            font-size: 0.8rem;
+        }
+
+        .rotation-stat {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 0.5rem;
+            border-radius: 0.25rem;
+            text-align: center;
+        }
+
+        .rotation-stat-value {
+            font-size: 1.2rem;
+            font-weight: 700;
+            color: var(--accent);
+        }
+
+        /* Legend */
+        .legend {
+            display: flex;
+            gap: 2rem;
+            padding: 1rem 2rem;
+            background: rgba(15, 23, 42, 0.8);
+            border-bottom: 1px solid var(--border);
+            flex-wrap: wrap;
+            font-size: 0.85rem;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .legend-color {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+        }
+
+        /* Filters */
+        .filters {
+            padding: 1.5rem 2rem;
+            background: rgba(15, 23, 42, 0.8);
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            gap: 1rem;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .filter-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.25rem;
+        }
+
+        .filter-label {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+        }
+
+        select, input {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            color: var(--text-primary);
+            padding: 0.5rem 1rem;
+            border-radius: 0.375rem;
+            font-size: 0.9rem;
+            min-width: 150px;
+        }
+
+        select:focus, input:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+
+        /* Responsive */
+        @media (max-width: 1024px) {
+            .months-comparison {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .header {
+                padding: 1rem;
+            }
+            
+            .header h1 {
+                font-size: 1.3rem;
+            }
+            
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .charts-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .week-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .bimestre-header {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+
+            .tech-legend {
+                flex-direction: column;
+                width: 100%;
+            }
+
+            .rotation-stats {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* Animations */
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+
+        .updating {
+            animation: pulse 1.5s infinite;
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: var(--bg-dark);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--border);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--accent);
+        }
+    </style>
+</head>
+<body>
+
+    <header class="header">
+        <h1>🔧 Sistema de Mantenimiento Preventivo 2026</h1>
+        <div class="header-controls">
+            <button class="btn btn-toggle" onclick="toggleDashboard()">
+                <span id="dashboard-toggle-text">📊 Minimizar Dashboard</span>
+            </button>
+            <button class="btn btn-primary" onclick="exportSchedule()">
+                📥 Exportar Cronograma
+            </button>
+        </div>
+    </header>
+
+    <!-- Dashboard -->
+    <div id="dashboard" class="dashboard">
+        <div class="dashboard-header" onclick="toggleDashboard()">
+            <h2>📈 Estadísticas en Tiempo Real</h2>
+            <span style="color: var(--accent); font-size: 1.5rem;">−</span>
+        </div>
+        <div class="dashboard-content">
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-label">Total Tareas Programadas</div>
+                    <div class="stat-value" id="stat-total">0</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Tareas Completadas</div>
+                    <div class="stat-value" id="stat-completed">0</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">En Progreso</div>
+                    <div class="stat-value" id="stat-progress">0</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Pendientes</div>
+                    <div class="stat-value" id="stat-pending">0</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Eficiencia Walter</div>
+                    <div class="stat-value" id="stat-walter">0%</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Eficiencia Adrián</div>
+                    <div class="stat-value" id="stat-adrian">0%</div>
+                </div>
+            </div>
+
+            <div class="charts-grid">
+                <div class="chart-container">
+                    <div class="chart-title">Distribución por Tipo de Equipo</div>
+                    <canvas id="equipmentChart"></canvas>
+                </div>
+                <div class="chart-container">
+                    <div class="chart-title">Progreso por Bimestre</div>
+                    <canvas id="bimestreChart"></canvas>
+                </div>
+                <div class="chart-container">
+                    <div class="chart-title">Comparativa Técnicos</div>
+                    <canvas id="technicianChart"></canvas>
+                </div>
+                <div class="chart-container">
+                    <div class="chart-title">Distribución Mes 1 vs Mes 2</div>
+                    <canvas id="monthDistributionChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Legend -->
+    <div class="legend">
+        <div class="legend-item">
+            <div class="legend-color" style="background: var(--pending)"></div>
+            <span>Pendiente</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color" style="background: var(--warning)"></div>
+            <span>En Proceso</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color" style="background: var(--success)"></div>
+            <span>Culminado</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color" style="background: var(--walter)"></div>
+            <span>Walter (Mañana)</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color" style="background: var(--adrian)"></div>
+            <span>Adrián (Noche)</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color" style="background: var(--terrazas)"></div>
+            <span>Terrazas (1x Bimestre)</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color" style="background: var(--danger)"></div>
+            <span>Equipos Críticos (25min)</span>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="filters">
+        <div class="filter-group">
+            <label class="filter-label">Bimestre</label>
+            <select id="filter-bimestre" onchange="applyFilters()">
+                <option value="all">Todos</option>
+                <option value="0">Marzo - Abril</option>
+                <option value="1">Mayo - Junio</option>
+                <option value="2">Julio - Agosto</option>
+                <option value="3">Septiembre - Octubre</option>
+                <option value="4">Noviembre - Diciembre</option>
+            </select>
+        </div>
+        <div class="filter-group">
+            <label class="filter-label">Técnico</label>
+            <select id="filter-tech" onchange="applyFilters()">
+                <option value="all">Todos</option>
+                <option value="Walter">Walter</option>
+                <option value="Adrián">Adrián</option>
+            </select>
+        </div>
+        <div class="filter-group">
+            <label class="filter-label">Ubicación</label>
+            <select id="filter-location" onchange="applyFilters()">
+                <option value="all">Todas</option>
+                <option value="Candelaria">Candelaria</option>
+                <option value="Terrazas">Terrazas</option>
+            </select>
+        </div>
+        <div class="filter-group">
+            <label class="filter-label">Estado</label>
+            <select id="filter-status" onchange="applyFilters()">
+                <option value="all">Todos</option>
+                <option value="pending">Pendiente</option>
+                <option value="progress">En Proceso</option>
+                <option value="completed">Culminado</option>
+            </select>
+        </div>
+    </div>
+
+    <!-- Schedule Container -->
+    <div id="schedule-container">
+        <!-- Generated dynamically -->
+    </div>
+
+    <script>
+        // Configuración
+        const config = {
+            year: 2026,
+            shifts: {
+                morning: { start: '08:00', end: '10:00', tech: 'Walter' },
+                night: { start: '20:00', end: '22:00', tech: 'Adrián' },
+                terrazas: { start: '08:00', end: '22:00', tech: 'Walter' }
+            },
+            days: ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado']
+        };
+
+        // Equipos Candelaria (33 equipos)
+        const candelariaEquipment = [
+            { name: 'Puerta 1 Entrada 1', devices: ['Entervo_entry', 'Entervo_barrier'], critical: true, type: 'Entrada/Salida' },
+            { name: 'Puerta 1 Entrada 2', devices: ['Entervo_entry', 'Entervo_barrier'], critical: true, type: 'Entrada/Salida' },
+            { name: 'Puerta 1 Salida 1', devices: ['Entervo_exit', 'Entervo_barrier'], critical: true, type: 'Entrada/Salida' },
+            { name: 'Puerta 1 Salida 2', devices: ['Entervo_exit', 'Entervo_barrier'], critical: true, type: 'Entrada/Salida' },
+            { name: 'Puerta 3 Entrada', devices: ['Entervo_entry', 'Entervo_barrier'], critical: true, type: 'Entrada/Salida' },
+            { name: 'Puerta 3 Salida', devices: ['Entervo_exit', 'Entervo_barrier'], critical: true, type: 'Entrada/Salida' },
+            { name: 'Puerta 4 Entrada', devices: ['Entervo_entry', 'Entervo_barrier'], critical: true, type: 'Entrada/Salida' },
+            { name: 'Puerta 4 Salida', devices: ['Entervo_exit', 'Entervo_barrier'], critical: true, type: 'Entrada/Salida' },
+            { name: 'Puerta 5 Entrada 1', devices: ['Entervo_entry', 'Entervo_barrier'], critical: true, type: 'Entrada/Salida' },
+            { name: 'Puerta 5 Entrada 2', devices: ['Entervo_entry', 'Entervo_barrier'], critical: true, type: 'Entrada/Salida' },
+            { name: 'Puerta 5 Salida 1', devices: ['Entervo_exit', 'Entervo_barrier'], critical: true, type: 'Entrada/Salida' },
+            { name: 'Puerta 5 Salida 2', devices: ['Entervo_exit', 'Entervo_barrier'], critical: true, type: 'Entrada/Salida' },
+            { name: 'Entrada Motos', devices: ['Entervo_entry', 'Entervo_barrier'], critical: true, type: 'Entrada/Salida' },
+            { name: 'Salida Motos', devices: ['Entervo_lane', 'Entervo_barrier'], critical: true, type: 'Entrada/Salida' },
+            { name: 'Entervo_pay Miranda', devices: ['ATM', 'HKA80'], critical: true, type: 'Cajero' },
+            { name: 'Entervo_pay Andrés Bello', devices: ['ATM', 'HKA80'], critical: true, type: 'Cajero' },
+            { name: 'Entervo_pay Sioux', devices: ['ATM', 'HKA80'], critical: true, type: 'Cajero' },
+            { name: 'Entervo_pay Río', devices: ['ATM', 'HKA80'], critical: true, type: 'Cajero' },
+            { name: 'Cámara Gerencia', devices: ['Reolink'], type: 'Cámara' },
+            { name: 'Cámara Gerencia Ext', devices: ['Reolink'], type: 'Cámara' },
+            { name: 'Cámara Valet Parking', devices: ['Reolink'], type: 'Cámara' },
+            { name: 'Cámara Sótano 2-1', devices: ['Reolink'], type: 'Cámara' },
+            { name: 'Cámara Sótano 2-2', devices: ['Reolink'], type: 'Cámara' },
+            { name: 'Cámara Puerta 1', devices: ['Reolink'], type: 'Cámara' },
+            { name: 'Cámara Puerta 3', devices: ['Reolink'], type: 'Cámara' },
+            { name: 'Cámara Puerta 4', devices: ['Reolink'], type: 'Cámara' },
+            { name: 'Cámara Puerta 5', devices: ['Reolink'], type: 'Cámara' },
+            { name: 'Gabinete Nido Guajiros', devices: ['Gabinete'], type: 'Gabinete' },
+            { name: 'Gabinete Gerencia', devices: ['Gabinete'], type: 'Gabinete' },
+            { name: 'Gabinete Sioux', devices: ['Gabinete'], type: 'Gabinete' },
+            { name: 'Gabinete Andrés Bello', devices: ['Gabinete'], type: 'Gabinete' },
+            { name: 'Impresora Taquilla Sioux', devices: ['HKA80', 'HKA80'], type: 'Impresora' },
+            { name: 'Impresora Taquilla Andrés Bello', devices: ['HKA80', 'HKA80'], type: 'Impresora' },
+            { name: 'Impresora Taquilla Miranda', devices: ['HKA80'], type: 'Impresora' }
+        ];
+
+        // Equipos Terrazas (10 equipos)
+        const terrazasEquipment = [
+            { name: 'Entrada 5', devices: ['Entervo_entry', 'Entervo_barrier'], critical: true, type: 'Entrada/Salida' },
+            { name: 'Impresora HKA-80', devices: ['HKA80'], type: 'Impresora' },
+            { name: 'Impresora CR2050', devices: ['CR2050'], type: 'Impresora' },
+            { name: 'Desktop A', devices: ['Desktop'], type: 'Computadora' },
+            { name: 'Desktop B', devices: ['Desktop'], type: 'Computadora' },
+            { name: 'Cámara Redoma', devices: ['Reolink'], type: 'Cámara' },
+            { name: 'Cámara Puerta 5', devices: ['Reolink'], type: 'Cámara' },
+            { name: 'Cámara Taquilla', devices: ['Reolink'], type: 'Cámara' },
+            { name: 'Gabinete Acuario', devices: ['Gabinete'], type: 'Gabinete' },
+            { name: 'Gabinete Taquilla', devices: ['Gabinete'], type: 'Gabinete' }
+        ];
+
+        let taskStatus = {};
+        let scheduleData = [];
+        let equipmentRotation = {};
+
+        // Dividir array en dos partes iguales
+        function splitArrayInHalf(array) {
+            const mid = Math.ceil(array.length / 2);
+            return {
+                first: array.slice(0, mid),
+                second: array.slice(mid)
+            };
+        }
+
+        // Generar cronograma bimestral con distribución equilibrada
+        function generateSchedule() {
+            const bimestres = [
+                { id: 0, months: [2, 3], name: 'Marzo - Abril' },
+                { id: 1, months: [4, 5], name: 'Mayo - Junio' },
+                { id: 2, months: [6, 7], name: 'Julio - Agosto' },
+                { id: 3, months: [8, 9], name: 'Septiembre - Octubre' },
+                { id: 4, months: [10, 11], name: 'Noviembre - Diciembre' }
+            ];
+
+            let taskId = 0;
+            const schedule = [];
+
+            bimestres.forEach((bimestre) => {
+                const bimestreData = {
+                    id: bimestre.id,
+                    name: bimestre.name,
+                    months: []
+                };
+
+                // Dividir equipos en dos mitades para distribución entre meses
+                const candelariaSplit = splitArrayInHalf([...candelariaEquipment]);
+                const terrazasSplit = splitArrayInHalf([...terrazasEquipment]);
+
+                // Reiniciar rotación de equipos para cada bimestre
+                equipmentRotation[bimestre.id] = {
+                    month1: {
+                        candelaria: candelariaSplit.first,
+                        terrazas: terrazasSplit.first,
+                        used: new Set()
+                    },
+                    month2: {
+                        candelaria: candelariaSplit.second,
+                        terrazas: terrazasSplit.second,
+                        used: new Set()
+                    },
+                    terrazasAssigned: false // Control para asignar Terrazas solo una vez por bimestre
+                };
+
+                bimestre.months.forEach((monthNum, monthIndex) => {
+                    const isFirstMonth = monthIndex === 0;
+                    const monthData = {
+                        month: monthNum,
+                        monthName: new Date(2026, monthNum).toLocaleDateString('es-ES', { month: 'long' }),
+                        year: 2026,
+                        weeks: [],
+                        isFirstMonth: isFirstMonth
+                    };
+
+                    // Obtener días trabajables (viernes, sábado, domingo)
+                    const daysInMonth = new Date(2026, monthNum + 1, 0).getDate();
+                    const workingDays = [];
+                    
+                    for (let day = 1; day <= daysInMonth; day++) {
+                        const date = new Date(2026, monthNum, day);
+                        const dayOfWeek = date.getDay();
+                        
+                        if (dayOfWeek === 5 || dayOfWeek === 6 || dayOfWeek === 0) {
+                            workingDays.push({
+                                date: date,
+                                dayOfWeek: dayOfWeek,
+                                dayName: config.days[dayOfWeek],
+                                dateStr: `${String(day).padStart(2, '0')}/${String(monthNum + 1).padStart(2, '0')}/26`,
+                                fullDate: `${String(day).padStart(2, '0')}/${String(monthNum + 1).padStart(2, '0')}/26 ${config.days[dayOfWeek]}`,
+                                isSunday: dayOfWeek === 0
+                            });
+                        }
+                    }
+
+                    // Determinar en qué mes va Terrazas (alternar entre bimestres)
+                    // Bimestre par (0, 2, 4): Terrazas en mes 1
+                    // Bimestre impar (1, 3): Terrazas en mes 2
+                    const terrazasInFirstMonth = bimestre.id % 2 === 0;
+                    const assignTerrazasThisMonth = isFirstMonth === terrazasInFirstMonth;
+
+                    // Distribuir equipos entre los días del mes
+                    workingDays.forEach((day) => {
+                        const dayShifts = {
+                            date: day,
+                            shifts: []
+                        };
+
+                        // Asignar Terrazas solo una vez por bimestre en el mes correspondiente
+                        if (day.isSunday && assignTerrazasThisMonth && !equipmentRotation[bimestre.id].terrazasAssigned) {
+                            const rotation = isFirstMonth ? equipmentRotation[bimestre.id].month1 : equipmentRotation[bimestre.id].month2;
+                            const terrazasEquip = selectEquipmentsForTerrazas(rotation);
+                            
+                            if (terrazasEquip.length > 0) {
+                                dayShifts.shifts.push({
+                                    tech: 'Walter',
+                                    location: 'Terrazas',
+                                    time: '08:00 AM - 10:00 PM',
+                                    type: 'terrazas',
+                                    equipments: terrazasEquip.map(eq => ({
+                                        ...eq,
+                                        id: taskId++,
+                                        status: 'pending'
+                                    }))
+                                });
+                                equipmentRotation[bimestre.id].terrazasAssigned = true;
+                            }
+                        } else if (!day.isSunday) {
+                            // Viernes y Sábados: Candelaria
+                            const rotation = isFirstMonth ? equipmentRotation[bimestre.id].month1 : equipmentRotation[bimestre.id].month2;
+                            
+                            // Turno Mañana - Walter
+                            const morningEquip = selectEquipmentsForCandelaria(rotation, 3);
+                            if (morningEquip.length > 0) {
+                                dayShifts.shifts.push({
+                                    tech: 'Walter',
+                                    location: 'Candelaria',
+                                    time: '08:00 AM - 10:00 AM',
+                                    type: 'morning',
+                                    equipments: morningEquip.map(eq => ({
+                                        ...eq,
+                                        id: taskId++,
+                                        status: 'pending'
+                                    }))
+                                });
+                            }
+
+                            // Turno Noche - Adrián
+                            const nightEquip = selectEquipmentsForCandelaria(rotation, 3);
+                            if (nightEquip.length > 0) {
+                                dayShifts.shifts.push({
+                                    tech: 'Adrián',
+                                    location: 'Candelaria',
+                                    time: '08:00 PM - 10:00 PM',
+                                    type: 'night',
+                                    equipments: nightEquip.map(eq => ({
+                                        ...eq,
+                                        id: taskId++,
+                                        status: 'pending'
+                                    }))
+                                });
+                            }
+                        }
+
+                        if (dayShifts.shifts.length > 0) {
+                            monthData.weeks.push(dayShifts);
+                        }
+                    });
+
+                    bimestreData.months.push(monthData);
+                });
+
+                schedule.push(bimestreData);
+            });
+
+            return schedule;
+        }
+
+        function selectEquipmentsForTerrazas(rotation) {
+            const available = rotation.terrazas;
+            const used = rotation.used;
+            const selected = [];
+
+            // Seleccionar todos los equipos de Terrazas no usados (hasta 5 por turno)
+            const unused = available.filter(eq => !used.has(eq.name));
+            
+            const limit = Math.min(5, unused.length);
+            for (let i = 0; i < limit; i++) {
+                const eq = unused[i];
+                selected.push(eq);
+                used.add(eq.name);
+            }
+
+            return selected;
+        }
+
+        function selectEquipmentsForCandelaria(rotation, maxCount) {
+            const available = rotation.candelaria;
+            const used = rotation.used;
+            const selected = [];
+
+            // Filtrar equipos no usados
+            const unused = available.filter(eq => !used.has(eq.name));
+            
+            // Priorizar equipos críticos primero (pero solo 1 por turno)
+            const critical = unused.filter(eq => eq.critical);
+            const standard = unused.filter(eq => !eq.critical);
+
+            // Seleccionar equipos
+            if (critical.length > 0 && selected.length < maxCount) {
+                selected.push(critical[0]);
+                used.add(critical[0].name);
+            }
+
+            // Completar con equipos standard
+            while (selected.length < maxCount && standard.length > 0) {
+                const eq = standard.shift();
+                selected.push(eq);
+                used.add(eq.name);
+            }
+
+            return selected;
+        }
+
+        // Renderizar cronograma
+        function renderSchedule() {
+            const container = document.getElementById('schedule-container');
+            container.innerHTML = '';
+
+            scheduleData.forEach(bimestre => {
+                const bimestreDiv = document.createElement('div');
+                bimestreDiv.className = 'bimestre-section';
+                bimestreDiv.dataset.bimestre = bimestre.id;
+
+                // Header del bimestre
+                const header = document.createElement('div');
+                header.className = 'bimestre-header';
+                
+                // Contar equipos por técnico y ubicación
+                let stats = { walter: 0, adrian: 0, terrazas: 0, candelaria: 0 };
+                let monthStats = [0, 0]; // Contador para cada mes
+                
+                bimestre.months.forEach((month, idx) => {
+                    month.weeks.forEach(day => {
+                        day.shifts.forEach(shift => {
+                            const count = shift.equipments.length;
+                            if (shift.tech === 'Walter') stats.walter += count;
+                            if (shift.tech === 'Adrián') stats.adrian += count;
+                            if (shift.location === 'Terrazas') stats.terrazas += count;
+                            if (shift.location === 'Candelaria') stats.candelaria += count;
+                            monthStats[idx] += count;
+                        });
+                    });
+                });
+
+                header.innerHTML = `
+                    <div>
+                        <div class="bimestre-title">${bimestre.name}</div>
+                        <div class="bimestre-subtitle">
+                            Mes 1: ${monthStats[0]} equipos | Mes 2: ${monthStats[1]} equipos
+                        </div>
+                    </div>
+                    <div class="tech-legend">
+                        <div class="tech-badge tech-walter">
+                            <span>☀️</span>
+                            <div>
+                                <div style="color: var(--walter); font-weight: 600;">Walter</div>
+                                <div style="font-size: 0.75rem;">${stats.walter} equipos</div>
+                            </div>
+                        </div>
+                        <div class="tech-badge tech-adrian">
+                            <span>🌙</span>
+                            <div>
+                                <div style="color: var(--adrian); font-weight: 600;">Adrián</div>
+                                <div style="font-size: 0.75rem;">${stats.adrian} equipos</div>
+                            </div>
+                        </div>
+                        <div class="tech-badge tech-terrazas">
+                            <span>🏢</span>
+                            <div>
+                                <div style="color: var(--terrazas); font-weight: 600;">Terrazas</div>
+                                <div style="font-size: 0.75rem;">${stats.terrazas} equipos (1x)</div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+
+                bimestreDiv.appendChild(header);
+
+                // Aviso especial para Terrazas
+                const terrazasMonth = bimestre.id % 2 === 0 ? 'primer' : 'segundo';
+                const specialNotice = document.createElement('div');
+                specialNotice.className = 'special-notice';
+                specialNotice.innerHTML = `
+                    <div class="special-notice-icon">📅</div>
+                    <div class="special-notice-text">
+                        <strong>Distribución Equilibrada:</strong> Terrazas se programa <strong>UNA sola vez</strong> en este bimestre (${terrazasMonth} mes). 
+                        La carga de Candelaria se divide 50% en cada mes para equilibrar el trabajo.
+                    </div>
+                `;
+                bimestreDiv.appendChild(specialNotice);
+
+                // Comparación de meses
+                const monthsComparison = document.createElement('div');
+                monthsComparison.className = 'months-comparison';
+
+                bimestre.months.forEach((month, idx) => {
+                    const monthCol = document.createElement('div');
+                    monthCol.className = 'month-column';
+                    
+                    // Calcular estadísticas del mes
+                    let totalEquipos = 0;
+                    let terrazasCount = 0;
+                    let candelariaCount = 0;
+                    let criticalCount = 0;
+                    
+                    month.weeks.forEach(day => {
+                        day.shifts.forEach(shift => {
+                            totalEquipos += shift.equipments.length;
+                            if (shift.location === 'Terrazas') terrazasCount++;
+                            if (shift.location === 'Candelaria') candelariaCount++;
+                            criticalCount += shift.equipments.filter(e => e.critical).length;
+                        });
+                    });
+
+                    const isTerrazasMonth = (bimestre.id % 2 === 0 && idx === 0) || (bimestre.id % 2 !== 0 && idx === 1);
+                    const terrazasBadge = isTerrazasMonth ? '<span style="color: var(--terrazas); font-size: 0.8rem;"> (Incluye Terrazas)</span>' : '';
+
+                    const monthTitle = document.createElement('div');
+                    monthTitle.className = 'month-title';
+                    monthTitle.innerHTML = `
+                        <span style="text-transform: capitalize;">${month.monthName} 2026${terrazasBadge}</span>
+                        <span class="month-summary">${totalEquipos} equipos</span>
+                    `;
+                    monthCol.appendChild(monthTitle);
+
+                    // Grid de días
+                    const weekGrid = document.createElement('div');
+                    weekGrid.className = 'week-grid';
+
+                    month.weeks.forEach(day => {
+                        const dayCard = createDayCard(day, isTerrazasMonth && day.date.isSunday);
+                        weekGrid.appendChild(dayCard);
+                    });
+
+                    monthCol.appendChild(weekGrid);
+                    monthsComparison.appendChild(monthCol);
+                });
+
+                bimestreDiv.appendChild(monthsComparison);
+
+                // Info de rotación de equipos
+                const rotationInfo = document.createElement('div');
+                rotationInfo.className = 'rotation-info';
+                
+                const rotation = equipmentRotation[bimestre.id];
+                const month1Used = Array.from(rotation.month1.used);
+                const month2Used = Array.from(rotation.month2.used);
+                
+                rotationInfo.innerHTML = `
+                    <div class="rotation-title">🔄 Distribución de Equipos en ${bimestre.name}</div>
+                    <div class="rotation-stats">
+                        <div class="rotation-stat">
+                            <div class="rotation-stat-value">${month1Used.length}</div>
+                            <div>Mes 1</div>
+                        </div>
+                        <div class="rotation-stat">
+                            <div class="rotation-stat-value">${month2Used.length}</div>
+                            <div>Mes 2</div>
+                        </div>
+                        <div class="rotation-stat">
+                            <div class="rotation-stat-value">${rotation.terrazasAssigned ? '✓' : '✗'}</div>
+                            <div>Terrazas</div>
+                        </div>
+                    </div>
+                    <div style="margin-top: 0.5rem; font-size: 0.8rem; color: var(--text-secondary);">
+                        <strong>Total equipos utilizados:</strong> ${month1Used.length + month2Used.length} | 
+                        <strong>Sin repetición dentro del bimestre</strong>
+                    </div>
+                `;
+                bimestreDiv.appendChild(rotationInfo);
+
+                container.appendChild(bimestreDiv);
+            });
+
+            updateStats();
+        }
+
+        function createDayCard(day, isTerrazasDay = false) {
+            const card = document.createElement('div');
+            card.className = 'day-card';
+            
+            if (isTerrazasDay) {
+                card.classList.add('terrazas-special');
+            }
+
+            const hasCritical = day.shifts.some(shift => 
+                shift.equipments.some(e => e.critical)
+            );
+            if (hasCritical) card.classList.add('critical');
+
+            let shiftsHtml = day.shifts.map(shift => createShiftHtml(shift)).join('');
+
+            const sundayBadge = day.date.isSunday ? '<span class="sunday-badge">Domingo</span>' : '';
+            const terrazasOnceBadge = isTerrazasDay ? '<span class="terrazas-once-badge">1x Bimestre</span>' : '';
+
+            card.innerHTML = `
+                <div class="day-header">
+                    <div class="day-title">
+                        ${day.date.dayName}
+                        ${sundayBadge}
+                        ${terrazasOnceBadge}
+                    </div>
+                    <div class="day-date">${day.date.dateStr}</div>
+                </div>
+                ${shiftsHtml}
+            `;
+
+            return card;
+        }
+
+        function createShiftHtml(shift) {
+            const techClass = shift.type === 'morning' ? 'tech-walter-text' : 
+                             shift.type === 'terrazas' ? 'tech-terrazas-text' : 'tech-adrian-text';
+            const shiftClass = shift.type;
+
+            const equipmentsHtml = shift.equipments.map(eq => {
+                const status = taskStatus[eq.id] || 'pending';
+                const statusClass = `status-${status}`;
+                const statusText = status === 'pending' ? 'Pendiente' : 
+                                  status === 'progress' ? 'En Proceso' : 'Culminado';
+                
+                const criticalBadge = eq.critical ? '<span class="critical-badge">⚠️</span>' : '';
+                const timeBadge = eq.critical ? '<span class="time-badge">(25min)</span>' : '';
+                
+                return `
+                    <div class="equipment-item" data-id="${eq.id}">
+                        <div class="equipment-name">
+                            ${criticalBadge}
+                            ${eq.name}${timeBadge}
+                            <span class="equipment-location">${shift.location}</span>
+                        </div>
+                        <button class="status-toggle ${statusClass}" onclick="toggleStatus(${eq.id}, this)">
+                            ${statusText}
+                        </button>
+                    </div>
+                `;
+            }).join('');
+
+            const icon = shift.type === 'morning' ? '☀️' : shift.type === 'terrazas' ? '🏢' : '🌙';
+            const techLabel = shift.type === 'terrazas' ? 'Walter (Terrazas)' : shift.tech;
+
+            return `
+                <div class="shift-block ${shiftClass}">
+                    <div class="shift-header">
+                        <span class="tech-name ${techClass}">${icon} ${techLabel}</span>
+                        <span class="shift-time">${shift.time}</span>
+                    </div>
+                    <div class="equipment-list">
+                        ${equipmentsHtml}
+                    </div>
+                </div>
+            `;
+        }
+
+        // Toggle estado
+        function toggleStatus(taskId, btn) {
+            const states = ['pending', 'progress', 'completed'];
+            const currentState = taskStatus[taskId] || 'pending';
+            const currentIndex = states.indexOf(currentState);
+            const nextState = states[(currentIndex + 1) % states.length];
+            
+            taskStatus[taskId] = nextState;
+            
+            const stateText = nextState === 'pending' ? 'Pendiente' : 
+                             nextState === 'progress' ? 'En Proceso' : 'Culminado';
+            
+            btn.className = `status-toggle status-${nextState}`;
+            btn.textContent = stateText;
+            
+            updateStats();
+            updateCharts();
+        }
+
+        // Actualizar estadísticas
+        function updateStats() {
+            let total = 0;
+            let completed = 0;
+            let progress = 0;
+            let pending = 0;
+            let walterTasks = 0;
+            let walterCompleted = 0;
+            let adrianTasks = 0;
+            let adrianCompleted = 0;
+
+            scheduleData.forEach(bimestre => {
+                bimestre.months.forEach(month => {
+                    month.weeks.forEach(day => {
+                        day.shifts.forEach(shift => {
+                            shift.equipments.forEach(eq => {
+                                total++;
+                                const status = taskStatus[eq.id] || 'pending';
+                                
+                                if (status === 'completed') completed++;
+                                else if (status === 'progress') progress++;
+                                else pending++;
+
+                                if (shift.tech === 'Walter') {
+                                    walterTasks++;
+                                    if (status === 'completed') walterCompleted++;
+                                } else {
+                                    adrianTasks++;
+                                    if (status === 'completed') adrianCompleted++;
+                                }
+                            });
+                        });
+                    });
+                });
+            });
+
+            animateValue('stat-total', parseInt(document.getElementById('stat-total').innerText) || 0, total, 1000);
+            animateValue('stat-completed', parseInt(document.getElementById('stat-completed').innerText) || 0, completed, 1000);
+            animateValue('stat-progress', parseInt(document.getElementById('stat-progress').innerText) || 0, progress, 1000);
+            animateValue('stat-pending', parseInt(document.getElementById('stat-pending').innerText) || 0, pending, 1000);
+
+            const walterEff = walterTasks > 0 ? Math.round((walterCompleted / walterTasks) * 100) : 0;
+            const adrianEff = adrianTasks > 0 ? Math.round((adrianCompleted / adrianTasks) * 100) : 0;
+
+            document.getElementById('stat-walter').textContent = walterEff + '%';
+            document.getElementById('stat-adrian').textContent = adrianEff + '%';
+        }
+
+        function animateValue(id, start, end, duration) {
+            if (start === end) return;
+            const obj = document.getElementById(id);
+            const range = end - start;
+            const minTimer = 50;
+            let stepTime = Math.abs(Math.floor(duration / range));
+            stepTime = Math.max(stepTime, minTimer);
+            
+            let startTime = new Date().getTime();
+            let endTime = startTime + duration;
+            let timer;
+            
+            function run() {
+                let now = new Date().getTime();
+                let remaining = Math.max((endTime - now) / duration, 0);
+                let value = Math.round(end - (remaining * range));
+                obj.innerHTML = value;
+                if (value == end) {
+                    clearInterval(timer);
+                }
+            }
+            
+            timer = setInterval(run, stepTime);
+            run();
+        }
+
+        // Gráficos
+        let equipmentChart, bimestreChart, technicianChart, monthDistributionChart;
+
+        function initCharts() {
+            const ctx1 = document.getElementById('equipmentChart').getContext('2d');
+            const ctx2 = document.getElementById('bimestreChart').getContext('2d');
+            const ctx3 = document.getElementById('technicianChart').getContext('2d');
+            const ctx4 = document.getElementById('monthDistributionChart').getContext('2d');
+
+            Chart.defaults.color = '#94a3b8';
+            Chart.defaults.borderColor = '#334155';
+
+            equipmentChart = new Chart(ctx1, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Entradas/Salidas', 'Cajeros', 'Cámaras', 'Gabinetes', 'Impresoras', 'Computadoras'],
+                    datasets: [{
+                        data: [15, 4, 10, 7, 5, 2],
+                        backgroundColor: ['#f44336', '#ff9800', '#2196f3', '#4caf50', '#9c27b0', '#00bcd4'],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: { position: 'right' }
+                    }
+                }
+            });
+
+            bimestreChart = new Chart(ctx2, {
+                type: 'bar',
+                data: {
+                    labels: ['Mar-Abr', 'May-Jun', 'Jul-Ago', 'Sep-Oct', 'Nov-Dic'],
+                    datasets: [{
+                        label: 'Completadas',
+                        data: [0, 0, 0, 0, 0],
+                        backgroundColor: '#4caf50'
+                    }, {
+                        label: 'Pendientes',
+                        data: [40, 40, 40, 40, 40],
+                        backgroundColor: '#9e9e9e'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        x: { stacked: true },
+                        y: { stacked: true }
+                    }
+                }
+            });
+
+            technicianChart = new Chart(ctx3, {
+                type: 'radar',
+                data: {
+                    labels: ['Entradas', 'Cajeros', 'Cámaras', 'Gabinetes', 'Impresoras', 'Computadoras'],
+                    datasets: [{
+                        label: 'Walter',
+                        data: [8, 2, 8, 5, 4, 1],
+                        borderColor: '#fbbf24',
+                        backgroundColor: 'rgba(251, 191, 36, 0.2)'
+                    }, {
+                        label: 'Adrián',
+                        data: [6, 2, 5, 3, 3, 0],
+                        borderColor: '#818cf8',
+                        backgroundColor: 'rgba(129, 140, 248, 0.2)'
+                    }]
+                },
+                options: { responsive: true }
+            });
+
+            monthDistributionChart = new Chart(ctx4, {
+                type: 'bar',
+                data: {
+                    labels: ['Mar-Abr', 'May-Jun', 'Jul-Ago', 'Sep-Oct', 'Nov-Dic'],
+                    datasets: [{
+                        label: 'Mes 1',
+                        data: [20, 15, 20, 15, 20],
+                        backgroundColor: '#00bcd4'
+                    }, {
+                        label: 'Mes 2',
+                        data: [15, 20, 15, 20, 15],
+                        backgroundColor: '#ff9800'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        x: { stacked: false },
+                        y: { beginAtZero: true }
+                    }
+                }
+            });
+        }
+
+        function updateCharts() {
+            const bimestreData = [0, 0, 0, 0, 0];
+            const pendingData = [0, 0, 0, 0, 0];
+            
+            scheduleData.forEach((bimestre, idx) => {
+                let completed = 0;
+                let total = 0;
+                bimestre.months.forEach(month => {
+                    month.weeks.forEach(day => {
+                        day.shifts.forEach(shift => {
+                            shift.equipments.forEach(eq => {
+                                total++;
+                                if (taskStatus[eq.id] === 'completed') completed++;
+                            });
+                        });
+                    });
+                });
+                bimestreData[idx] = completed;
+                pendingData[idx] = total - completed;
+            });
+
+            bimestreChart.data.datasets[0].data = bimestreData;
+            bimestreChart.data.datasets[1].data = pendingData;
+            bimestreChart.update();
+        }
+
+        // Filtros
+        function applyFilters() {
+            const bimestre = document.getElementById('filter-bimestre').value;
+            const tech = document.getElementById('filter-tech').value;
+            const location = document.getElementById('filter-location').value;
+            const status = document.getElementById('filter-status').value;
+
+            document.querySelectorAll('.bimestre-section').forEach(section => {
+                const bimestreId = section.dataset.bimestre;
+                let showBimestre = bimestre === 'all' || bimestreId === bimestre;
+                
+                if (!showBimestre) {
+                    section.style.display = 'none';
+                    return;
+                }
+
+                section.style.display = 'block';
+                
+                section.querySelectorAll('.month-column').forEach(col => {
+                    let showCol = true;
+                    
+                    if (tech !== 'all') {
+                        const hasTech = col.textContent.includes(tech);
+                        if (!hasTech) showCol = false;
+                    }
+
+                    if (location !== 'all' && showCol) {
+                        const hasLocation = col.textContent.includes(location);
+                        if (!hasLocation) showCol = false;
+                    }
+
+                    col.style.display = showCol ? 'block' : 'none';
+                });
+
+                section.querySelectorAll('.day-card').forEach(card => {
+                    if (status !== 'all') {
+                        const equipments = card.querySelectorAll('.equipment-item');
+                        let hasStatus = false;
+                        equipments.forEach(eq => {
+                            const btn = eq.querySelector('.status-toggle');
+                            if (btn.classList.contains(`status-${status}`)) hasStatus = true;
+                        });
+                        card.style.display = hasStatus ? 'block' : 'none';
+                    }
+                });
+            });
+        }
+
+        function toggleDashboard() {
+            const dashboard = document.getElementById('dashboard');
+            const btnText = document.getElementById('dashboard-toggle-text');
+            
+            dashboard.classList.toggle('minimized');
+            
+            if (dashboard.classList.contains('minimized')) {
+                btnText.textContent = '📊 Maximizar Dashboard';
+            } else {
+                btnText.textContent = '📊 Minimizar Dashboard';
+            }
+        }
+
+        function exportSchedule() {
+            let csv = 'Bimestre,Mes,Fecha,Día,Técnico,Turno,Hora,Ubicación,Equipo,Tipo,Crítico,Estado\n';
+            
+            scheduleData.forEach(bimestre => {
+                bimestre.months.forEach(month => {
+                    month.weeks.forEach(day => {
+                        day.shifts.forEach(shift => {
+                            shift.equipments.forEach(eq => {
+                                const status = taskStatus[eq.id] || 'pending';
+                                const statusText = status === 'pending' ? 'Pendiente' : 
+                                                  status === 'progress' ? 'En Proceso' : 'Culminado';
+                                const critical = eq.critical ? 'Sí' : 'No';
+                                
+                                csv += `${bimestre.name},${month.monthName},${day.date.dateStr},${day.date.dayName},${shift.tech},${shift.type},${shift.time},${shift.location},${eq.name},${eq.type},${critical},${statusText}\n`;
+                            });
+                        });
+                    });
+                });
+            });
+
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = 'cronograma_mantenimiento_2026_distribuido.csv';
+            link.click();
+        }
+
+        // Inicialización
+        document.addEventListener('DOMContentLoaded', () => {
+            scheduleData = generateSchedule();
+            renderSchedule();
+            initCharts();
+        });
+    </script>
+</body>
+</html>
