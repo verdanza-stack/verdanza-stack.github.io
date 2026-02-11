@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sistema de Mantenimiento Preventivo Bimestral 2026 - Distribución Equilibrada</title>
+    <title>Sistema de Mantenimiento Preventivo 2026 - Distribución Optimizada</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         * {
@@ -345,6 +345,11 @@
             background: linear-gradient(145deg, rgba(255, 87, 34, 0.1), rgba(15, 23, 42, 0.9));
         }
 
+        .day-card.adrian-sunday {
+            border-left: 4px solid var(--adrian);
+            background: linear-gradient(145deg, rgba(129, 140, 248, 0.1), rgba(15, 23, 42, 0.9));
+        }
+
         .day-header {
             display: flex;
             justify-content: space-between;
@@ -373,6 +378,16 @@
 
         .sunday-badge {
             background: var(--terrazas);
+            color: white;
+            padding: 0.2rem 0.5rem;
+            border-radius: 0.25rem;
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .adrian-badge {
+            background: var(--adrian);
             color: white;
             padding: 0.2rem 0.5rem;
             border-radius: 0.25rem;
@@ -413,6 +428,12 @@
             border-left-color: var(--terrazas);
             background: rgba(255, 87, 34, 0.1);
             border: 1px solid rgba(255, 87, 34, 0.3);
+        }
+
+        .shift-block.adrian-sunday {
+            border-left-color: var(--adrian);
+            background: rgba(129, 140, 248, 0.1);
+            border: 1px solid rgba(129, 140, 248, 0.3);
         }
 
         .shift-header {
@@ -703,7 +724,7 @@
 <body>
 
     <header class="header">
-        <h1>🔧Cronograma de Mantenimiento Preventivo 2026</h1>
+        <h1>🔧 Sistema de Mantenimiento Preventivo 2026</h1>
         <div class="header-controls">
             <button class="btn btn-toggle" onclick="toggleDashboard()">
                 <span id="dashboard-toggle-text">📊 Minimizar Dashboard</span>
@@ -789,7 +810,7 @@
         </div>
         <div class="legend-item">
             <div class="legend-color" style="background: var(--adrian)"></div>
-            <span>Adrián (Noche)</span>
+            <span>Adrián (Noche/Domingo)</span>
         </div>
         <div class="legend-item">
             <div class="legend-color" style="background: var(--terrazas)"></div>
@@ -853,7 +874,8 @@
             shifts: {
                 morning: { start: '08:00', end: '10:00', tech: 'Walter' },
                 night: { start: '20:00', end: '22:00', tech: 'Adrián' },
-                terrazas: { start: '08:00', end: '22:00', tech: 'Walter' }
+                terrazas: { start: '08:00', end: '22:00', tech: 'Walter' },
+                adrianSunday: { start: '20:00', end: '22:00', tech: 'Adrián' }
             },
             days: ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado']
         };
@@ -923,7 +945,7 @@
             };
         }
 
-        // Generar cronograma bimestral con distribución equilibrada
+        // Generar cronograma bimestral con distribución equilibrada incluyendo domingos de Adrián
         function generateSchedule() {
             const bimestres = [
                 { id: 0, months: [2, 3], name: 'Marzo - Abril' },
@@ -959,7 +981,7 @@
                         terrazas: terrazasSplit.second,
                         used: new Set()
                     },
-                    terrazasAssigned: false // Control para asignar Terrazas solo una vez por bimestre
+                    terrazasAssigned: false
                 };
 
                 bimestre.months.forEach((monthNum, monthIndex) => {
@@ -987,25 +1009,31 @@
                                 dayName: config.days[dayOfWeek],
                                 dateStr: `${String(day).padStart(2, '0')}/${String(monthNum + 1).padStart(2, '0')}/26`,
                                 fullDate: `${String(day).padStart(2, '0')}/${String(monthNum + 1).padStart(2, '0')}/26 ${config.days[dayOfWeek]}`,
-                                isSunday: dayOfWeek === 0
+                                isSunday: dayOfWeek === 0,
+                                isFriday: dayOfWeek === 5,
+                                isSaturday: dayOfWeek === 6
                             });
                         }
                     }
 
                     // Determinar en qué mes va Terrazas (alternar entre bimestres)
-                    // Bimestre par (0, 2, 4): Terrazas en mes 1
-                    // Bimestre impar (1, 3): Terrazas en mes 2
                     const terrazasInFirstMonth = bimestre.id % 2 === 0;
                     const assignTerrazasThisMonth = isFirstMonth === terrazasInFirstMonth;
 
-                    // Distribuir equipos entre los días del mes
+                    // Distribuir equipos entre los días del mes de manera equilibrada
+                    // Calcular cuántos días tiene cada técnico
+                    const fridays = workingDays.filter(d => d.isFriday);
+                    const saturdays = workingDays.filter(d => d.isSaturday);
+                    const sundays = workingDays.filter(d => d.isSunday);
+
+                    // Asignar equipos a cada día
                     workingDays.forEach((day) => {
                         const dayShifts = {
                             date: day,
                             shifts: []
                         };
 
-                        // Asignar Terrazas solo una vez por bimestre en el mes correspondiente
+                        // Si es domingo de Terrazas (una sola vez por bimestre)
                         if (day.isSunday && assignTerrazasThisMonth && !equipmentRotation[bimestre.id].terrazasAssigned) {
                             const rotation = isFirstMonth ? equipmentRotation[bimestre.id].month1 : equipmentRotation[bimestre.id].month2;
                             const terrazasEquip = selectEquipmentsForTerrazas(rotation);
@@ -1024,8 +1052,44 @@
                                 });
                                 equipmentRotation[bimestre.id].terrazasAssigned = true;
                             }
-                        } else if (!day.isSunday) {
-                            // Viernes y Sábados: Candelaria
+                            
+                            // También asignar turno de Adrián en Candelaria el mismo domingo (diferente horario)
+                            const rotationAdrian = isFirstMonth ? equipmentRotation[bimestre.id].month1 : equipmentRotation[bimestre.id].month2;
+                            const adrianEquip = selectEquipmentsForCandelaria(rotationAdrian, 3);
+                            
+                            if (adrianEquip.length > 0) {
+                                dayShifts.shifts.push({
+                                    tech: 'Adrián',
+                                    location: 'Candelaria',
+                                    time: '08:00 PM - 10:00 PM',
+                                    type: 'adrianSunday',
+                                    equipments: adrianEquip.map(eq => ({
+                                        ...eq,
+                                        id: taskId++,
+                                        status: 'pending'
+                                    }))
+                                });
+                            }
+                        } else if (day.isSunday) {
+                            // Domingos sin Terrazas: solo Adrián en Candelaria
+                            const rotation = isFirstMonth ? equipmentRotation[bimestre.id].month1 : equipmentRotation[bimestre.id].month2;
+                            const adrianEquip = selectEquipmentsForCandelaria(rotation, 3);
+                            
+                            if (adrianEquip.length > 0) {
+                                dayShifts.shifts.push({
+                                    tech: 'Adrián',
+                                    location: 'Candelaria',
+                                    time: '08:00 PM - 10:00 PM',
+                                    type: 'adrianSunday',
+                                    equipments: adrianEquip.map(eq => ({
+                                        ...eq,
+                                        id: taskId++,
+                                        status: 'pending'
+                                    }))
+                                });
+                            }
+                        } else {
+                            // Viernes y Sábados: Candelaria con turnos alternados
                             const rotation = isFirstMonth ? equipmentRotation[bimestre.id].month1 : equipmentRotation[bimestre.id].month2;
                             
                             // Turno Mañana - Walter
@@ -1080,10 +1144,9 @@
             const used = rotation.used;
             const selected = [];
 
-            // Seleccionar todos los equipos de Terrazas no usados (hasta 5 por turno)
             const unused = available.filter(eq => !used.has(eq.name));
-            
             const limit = Math.min(5, unused.length);
+            
             for (let i = 0; i < limit; i++) {
                 const eq = unused[i];
                 selected.push(eq);
@@ -1098,20 +1161,15 @@
             const used = rotation.used;
             const selected = [];
 
-            // Filtrar equipos no usados
             const unused = available.filter(eq => !used.has(eq.name));
-            
-            // Priorizar equipos críticos primero (pero solo 1 por turno)
             const critical = unused.filter(eq => eq.critical);
             const standard = unused.filter(eq => !eq.critical);
 
-            // Seleccionar equipos
             if (critical.length > 0 && selected.length < maxCount) {
                 selected.push(critical[0]);
                 used.add(critical[0].name);
             }
 
-            // Completar con equipos standard
             while (selected.length < maxCount && standard.length > 0) {
                 const eq = standard.shift();
                 selected.push(eq);
@@ -1135,9 +1193,8 @@
                 const header = document.createElement('div');
                 header.className = 'bimestre-header';
                 
-                // Contar equipos por técnico y ubicación
                 let stats = { walter: 0, adrian: 0, terrazas: 0, candelaria: 0 };
-                let monthStats = [0, 0]; // Contador para cada mes
+                let monthStats = [0, 0];
                 
                 bimestre.months.forEach((month, idx) => {
                     month.weeks.forEach(day => {
@@ -1171,7 +1228,7 @@
                             <span>🌙</span>
                             <div>
                                 <div style="color: var(--adrian); font-weight: 600;">Adrián</div>
-                                <div style="font-size: 0.75rem;">${stats.adrian} equipos</div>
+                                <div style="font-size: 0.75rem;">${stats.adrian} equipos (Domingos incl.)</div>
                             </div>
                         </div>
                         <div class="tech-badge tech-terrazas">
@@ -1186,15 +1243,15 @@
 
                 bimestreDiv.appendChild(header);
 
-                // Aviso especial para Terrazas
+                // Aviso especial
                 const terrazasMonth = bimestre.id % 2 === 0 ? 'primer' : 'segundo';
                 const specialNotice = document.createElement('div');
                 specialNotice.className = 'special-notice';
                 specialNotice.innerHTML = `
                     <div class="special-notice-icon">📅</div>
                     <div class="special-notice-text">
-                        <strong>Distribución Equilibrada:</strong> Terrazas se programa <strong>UNA sola vez</strong> en este bimestre (${terrazasMonth} mes). 
-                        La carga de Candelaria se divide 50% en cada mes para equilibrar el trabajo.
+                        <strong>Distribución Optimizada:</strong> Terrazas (${terrazasMonth} mes) + Adrián trabaja <strong>todos los domingos de 8:00 PM a 10:00 PM</strong> en Candelaria. 
+                        Carga equilibrada 50/50 entre meses.
                     </div>
                 `;
                 bimestreDiv.appendChild(specialNotice);
@@ -1207,18 +1264,15 @@
                     const monthCol = document.createElement('div');
                     monthCol.className = 'month-column';
                     
-                    // Calcular estadísticas del mes
                     let totalEquipos = 0;
                     let terrazasCount = 0;
-                    let candelariaCount = 0;
-                    let criticalCount = 0;
+                    let adrianSundayCount = 0;
                     
                     month.weeks.forEach(day => {
                         day.shifts.forEach(shift => {
                             totalEquipos += shift.equipments.length;
                             if (shift.location === 'Terrazas') terrazasCount++;
-                            if (shift.location === 'Candelaria') candelariaCount++;
-                            criticalCount += shift.equipments.filter(e => e.critical).length;
+                            if (shift.type === 'adrianSunday') adrianSundayCount++;
                         });
                     });
 
@@ -1229,16 +1283,16 @@
                     monthTitle.className = 'month-title';
                     monthTitle.innerHTML = `
                         <span style="text-transform: capitalize;">${month.monthName} 2026${terrazasBadge}</span>
-                        <span class="month-summary">${totalEquipos} equipos</span>
+                        <span class="month-summary">${totalEquipos} equipos | ${adrianSundayCount} domingos Adrián</span>
                     `;
                     monthCol.appendChild(monthTitle);
 
-                    // Grid de días
                     const weekGrid = document.createElement('div');
                     weekGrid.className = 'week-grid';
 
                     month.weeks.forEach(day => {
-                        const dayCard = createDayCard(day, isTerrazasMonth && day.date.isSunday);
+                        const isTerrazasDay = day.shifts.some(s => s.location === 'Terrazas');
+                        const dayCard = createDayCard(day, isTerrazasDay);
                         weekGrid.appendChild(dayCard);
                     });
 
@@ -1248,7 +1302,7 @@
 
                 bimestreDiv.appendChild(monthsComparison);
 
-                // Info de rotación de equipos
+                // Info de rotación
                 const rotationInfo = document.createElement('div');
                 rotationInfo.className = 'rotation-info';
                 
@@ -1272,10 +1326,6 @@
                             <div>Terrazas</div>
                         </div>
                     </div>
-                    <div style="margin-top: 0.5rem; font-size: 0.8rem; color: var(--text-secondary);">
-                        <strong>Total equipos utilizados:</strong> ${month1Used.length + month2Used.length} | 
-                        <strong>Sin repetición dentro del bimestre</strong>
-                    </div>
                 `;
                 bimestreDiv.appendChild(rotationInfo);
 
@@ -1293,6 +1343,11 @@
                 card.classList.add('terrazas-special');
             }
 
+            const hasAdrianSunday = day.shifts.some(s => s.type === 'adrianSunday');
+            if (hasAdrianSunday && !isTerrazasDay) {
+                card.classList.add('adrian-sunday');
+            }
+
             const hasCritical = day.shifts.some(shift => 
                 shift.equipments.some(e => e.critical)
             );
@@ -1301,6 +1356,7 @@
             let shiftsHtml = day.shifts.map(shift => createShiftHtml(shift)).join('');
 
             const sundayBadge = day.date.isSunday ? '<span class="sunday-badge">Domingo</span>' : '';
+            const adrianBadge = hasAdrianSunday ? '<span class="adrian-badge">Adrián</span>' : '';
             const terrazasOnceBadge = isTerrazasDay ? '<span class="terrazas-once-badge">1x Bimestre</span>' : '';
 
             card.innerHTML = `
@@ -1308,6 +1364,7 @@
                     <div class="day-title">
                         ${day.date.dayName}
                         ${sundayBadge}
+                        ${adrianBadge}
                         ${terrazasOnceBadge}
                     </div>
                     <div class="day-date">${day.date.dateStr}</div>
@@ -1346,7 +1403,9 @@
                 `;
             }).join('');
 
-            const icon = shift.type === 'morning' ? '☀️' : shift.type === 'terrazas' ? '🏢' : '🌙';
+            const icon = shift.type === 'morning' ? '☀️' : 
+                        shift.type === 'terrazas' ? '🏢' : 
+                        shift.type === 'adrianSunday' ? '🌙' : '🌙';
             const techLabel = shift.type === 'terrazas' ? 'Walter (Terrazas)' : shift.tech;
 
             return `
@@ -1519,7 +1578,7 @@
                         backgroundColor: 'rgba(251, 191, 36, 0.2)'
                     }, {
                         label: 'Adrián',
-                        data: [6, 2, 5, 3, 3, 0],
+                        data: [12, 2, 8, 5, 4, 1],
                         borderColor: '#818cf8',
                         backgroundColor: 'rgba(129, 140, 248, 0.2)'
                     }]
@@ -1661,7 +1720,7 @@
             const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
             const link = document.createElement('a');
             link.href = URL.createObjectURL(blob);
-            link.download = 'cronograma_mantenimiento_2026_distribuido.csv';
+            link.download = 'cronograma_mantenimiento_2026_adrian_domingos.csv';
             link.click();
         }
 
@@ -1673,6 +1732,4 @@
         });
     </script>
 </body>
-
 </html>
-
