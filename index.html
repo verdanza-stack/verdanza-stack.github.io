@@ -1730,9 +1730,24 @@
             renderSchedule();
             initCharts();
         });
+    
+    // Inicializar Supabase
+const supabaseUrl = 'https://yrtyaaygeselccbdimuq.supabase.co';
+const supabaseKey = 'sb_publishable_vo1BIyAXOM6j6Pxrztys8A_K3qP6yez';
+const supabase = supabase.createClient(supabaseUrl, supabaseKey);
+
+// Función para guardar el cambio cuando hagas clic
+async function saveToDatabase(taskId, newStatus) {
+    const { data, error } = await supabase
+        .from('mantenimiento')
+        .upsert({ task_id: taskId, status: newStatus }, { onConflict: 'task_id' });
+    
+    if (error) console.error("Error guardando:", error);
+}
     </script>
 </body>
 </html>
+
 
 
 
