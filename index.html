@@ -1436,24 +1436,24 @@ async function saveToDatabase(taskId, newStatus) {
         }
 
         // Toggle estado
-        function toggleStatus(taskId, btn) {
-            const states = ['pending', 'progress', 'completed'];
-            const currentState = taskStatus[taskId] || 'pending';
-            const currentIndex = states.indexOf(currentState);
-            const nextState = states[(currentIndex + 1) % states.length];
-            
-            taskStatus[taskId] = nextState;
-            
-            const stateText = nextState === 'pending' ? 'Pendiente' : 
-                             nextState === 'progress' ? 'En Proceso' : 'Culminado';
-            
-            btn.className = `status-toggle status-${nextState}`;
-            btn.textContent = stateText;
-            
-            updateStats();
-            updateCharts();
-        }
+        async function toggleStatus(taskId, btn) {
+    const states = ['pending', 'progress', 'completed'];
+    const currentState = taskStatus[taskId] || 'pending';
+    const nextState = states[(states.indexOf(currentState) + 1) % states.length];
+    
+    // --- NUEVO: Guardar en Supabase ---
+    const { error } = await supabase
+        .from('mantenimiento')
+        .upsert({ 
+            task_id: taskId.toString(), 
+            status: nextState 
+        }, { onConflict: 'task_id' });
 
+    if (error) {
+        console.error("Error guardando en DB:", error);
+        alert("No se pudo guardar el cambio en la base de datos");
+        return;
+    }
         // Actualizar estadísticas
         function updateStats() {
             let total = 0;
@@ -1747,6 +1747,7 @@ async function saveToDatabase(taskId, newStatus) {
     </script>
 </body>
 </html>
+
 
 
 
