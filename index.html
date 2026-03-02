@@ -868,20 +868,6 @@
     </div>
 
     <script>
- // Inicializar Supabase
-const supabaseUrl = 'https://yrtyaaygeselccbdimuq.supabase.co';
-const supabaseKey = 'sb_publishable_vo1BIyAXOM6j6Pxrztys8A_K3qP6yez';
-const supabase = supabase.createClient(supabaseUrl, supabaseKey);
-
-// Función para guardar el cambio cuando hagas clic
-async function saveToDatabase(taskId, newStatus) {
-    const { data, error } = await supabase
-        .from('mantenimiento')
-        .upsert({ task_id: taskId, status: newStatus }, { onConflict: 'task_id' });
-    
-    if (error) console.error("Error guardando:", error);
-}
-        
         // Configuración
         const config = {
             year: 2026,
@@ -1436,7 +1422,7 @@ async function saveToDatabase(taskId, newStatus) {
         }
 
         // Toggle estado
-     function toggleStatus(taskId, btn) {
+        function toggleStatus(taskId, btn) {
             const states = ['pending', 'progress', 'completed'];
             const currentState = taskStatus[taskId] || 'pending';
             const currentIndex = states.indexOf(currentState);
@@ -1452,7 +1438,8 @@ async function saveToDatabase(taskId, newStatus) {
             
             updateStats();
             updateCharts();
-    }
+        }
+
         // Actualizar estadísticas
         function updateStats() {
             let total = 0;
@@ -1746,6 +1733,12 @@ async function saveToDatabase(taskId, newStatus) {
     </script>
 </body>
 </html>
+
+
+
+
+
+
 
 
 
