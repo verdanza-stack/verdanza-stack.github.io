@@ -5,8 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Cronograma de Mantenimiento Preventivo 2026 - Candelaria/Terrazas</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <!-- Supabase Client CDN - Usando la versión UMD correcta -->
-    <script src="https://unpkg.com/@supabase/supabase-js@2.39.0/dist/umd/supabase.js"></script>
+    <!-- Supabase Client CDN - Versión específica y estable -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.3/dist/umd/supabase.min.js"></script>
     <style>
         * {
             margin: 0;
@@ -702,14 +702,14 @@
             border-color: var(--accent);
         }
 
-        /* Loading Overlay */
+        /* Loading Overlay - MEJORADO */
         .loading-overlay {
             position: fixed;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
-            background: rgba(15, 23, 42, 0.95);
+            background: rgba(15, 23, 42, 0.98);
             display: flex;
             flex-direction: column;
             justify-content: center;
@@ -730,6 +730,7 @@
             border-top-color: var(--accent);
             border-radius: 50%;
             animation: spin 1s linear infinite;
+            margin-bottom: 1rem;
         }
 
         @keyframes spin {
@@ -737,9 +738,54 @@
         }
 
         .loading-text {
-            margin-top: 1rem;
+            color: var(--text-primary);
+            font-size: 1.2rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .loading-subtext {
             color: var(--text-secondary);
-            font-size: 1.1rem;
+            font-size: 0.9rem;
+            max-width: 400px;
+            text-align: center;
+            line-height: 1.4;
+        }
+
+        .loading-error {
+            color: var(--danger);
+            font-size: 0.85rem;
+            margin-top: 1rem;
+            padding: 0.5rem 1rem;
+            background: rgba(244, 67, 54, 0.1);
+            border: 1px solid rgba(244, 67, 54, 0.3);
+            border-radius: 0.5rem;
+            max-width: 500px;
+            text-align: center;
+            display: none;
+        }
+
+        .loading-error.visible {
+            display: block;
+        }
+
+        .skip-loading-btn {
+            margin-top: 1.5rem;
+            padding: 0.75rem 1.5rem;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            color: var(--text-primary);
+            border-radius: 0.5rem;
+            cursor: pointer;
+            font-weight: 600;
+            display: none;
+        }
+
+        .skip-loading-btn.visible {
+            display: block;
+        }
+
+        .skip-loading-btn:hover {
+            background: var(--border);
         }
 
         /* Toast Notifications */
@@ -779,6 +825,58 @@
         .toast.success { background: var(--success); }
         .toast.error { background: var(--danger); }
         .toast.info { background: var(--accent); }
+
+        /* Debug Panel */
+        .debug-panel {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: var(--bg-card);
+            border: 2px solid var(--danger);
+            border-radius: 1rem;
+            padding: 2rem;
+            z-index: 10000;
+            max-width: 600px;
+            width: 90%;
+            display: none;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+        }
+
+        .debug-panel.visible {
+            display: block;
+        }
+
+        .debug-title {
+            color: var(--danger);
+            font-size: 1.3rem;
+            margin-bottom: 1rem;
+            font-weight: 700;
+        }
+
+        .debug-content {
+            font-family: monospace;
+            font-size: 0.85rem;
+            background: rgba(0,0,0,0.3);
+            padding: 1rem;
+            border-radius: 0.5rem;
+            max-height: 300px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            word-break: break-all;
+            color: var(--text-secondary);
+        }
+
+        .debug-close {
+            margin-top: 1rem;
+            padding: 0.5rem 1rem;
+            background: var(--danger);
+            color: white;
+            border: none;
+            border-radius: 0.5rem;
+            cursor: pointer;
+            font-weight: 600;
+        }
 
         /* Responsive */
         @media (max-width: 1024px) {
@@ -855,10 +953,22 @@
 </head>
 <body>
 
-    <!-- Loading Overlay -->
+    <!-- Loading Overlay Mejorado -->
     <div id="loading-overlay" class="loading-overlay">
         <div class="loading-spinner"></div>
-        <div class="loading-text" id="loading-text">Conectando con Supabase...</div>
+        <div class="loading-text" id="loading-text">Iniciando aplicación...</div>
+        <div class="loading-subtext" id="loading-subtext">Esperando a que se cargue el sistema</div>
+        <div class="loading-error" id="loading-error"></div>
+        <button class="skip-loading-btn" id="skip-loading-btn" onclick="forceStart()">
+            Usar modo offline
+        </button>
+    </div>
+
+    <!-- Debug Panel -->
+    <div id="debug-panel" class="debug-panel">
+        <div class="debug-title">⚠️ Error de Diagnóstico</div>
+        <div class="debug-content" id="debug-content"></div>
+        <button class="debug-close" onclick="closeDebug()">Cerrar y continuar offline</button>
     </div>
 
     <!-- Toast Container -->
@@ -1022,8 +1132,15 @@
         const SUPABASE_URL = 'https://yrtyaaygeselccbdimuq.supabase.co';
         const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlydHlhYXlnZXNlbGNjYmRpbXVxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI0NjA3NzMsImV4cCI6MjA4ODAzNjc3M30.CetuY3lmy9hmsNES9owfWXlW8zk9FPEnLSlXzyHBjas';
         
-        let supabaseClient;
-        let realtimeChannel;
+        let supabaseClient = null;
+        let realtimeChannel = null;
+        let isOnline = false;
+        let supabaseInitialized = false;
+        let initError = null;
+
+        // Referencias a elementos DOM
+        let loadingOverlay, loadingText, loadingSubtext, loadingError, skipLoadingBtn;
+        let connectionStatus, connectionText;
 
         // ==========================================
         // CONFIGURACIÓN APLICACIÓN
@@ -1094,33 +1211,105 @@
         let taskStatus = {};
         let scheduleData = [];
         let equipmentRotation = {};
-        let isOnline = false;
-        let supabaseInitialized = false;
 
         // ==========================================
-        // INICIALIZACIÓN SUPABASE - CORREGIDA
+        // INICIALIZACIÓN Y DIAGNÓSTICO
         // ==========================================
-        
+
+        function initDOMReferences() {
+            loadingOverlay = document.getElementById('loading-overlay');
+            loadingText = document.getElementById('loading-text');
+            loadingSubtext = document.getElementById('loading-subtext');
+            loadingError = document.getElementById('loading-error');
+            skipLoadingBtn = document.getElementById('skip-loading-btn');
+            connectionStatus = document.getElementById('connection-status');
+            connectionText = document.getElementById('connection-text');
+        }
+
+        function updateLoading(text, subtext = '') {
+            if (loadingText) loadingText.textContent = text;
+            if (loadingSubtext && subtext) loadingSubtext.textContent = subtext;
+        }
+
+        function showLoadingError(error) {
+            initError = error;
+            if (loadingError) {
+                loadingError.textContent = typeof error === 'string' ? error : error.message || 'Error desconocido';
+                loadingError.classList.add('visible');
+            }
+            if (skipLoadingBtn) skipLoadingBtn.classList.add('visible');
+            updateLoading('Error de conexión', 'No se pudo conectar con Supabase');
+        }
+
+        function hideLoading() {
+            if (loadingOverlay) {
+                loadingOverlay.classList.add('hidden');
+                setTimeout(() => {
+                    loadingOverlay.style.display = 'none';
+                }, 500);
+            }
+        }
+
+        function forceStart() {
+            hideLoading();
+            showToast('Iniciando en modo offline', 'info');
+            updateConnectionStatus('offline', 'Modo Offline');
+            // Asegurar que la app funcione
+            if (scheduleData.length === 0) {
+                scheduleData = generateSchedule();
+            }
+            renderSchedule();
+            updateStats();
+            updateCharts();
+        }
+
+        function showDebug(error) {
+            const panel = document.getElementById('debug-panel');
+            const content = document.getElementById('debug-content');
+            
+            let debugInfo = `Error: ${error.message || error}\n\n`;
+            debugInfo += `window.supabase existe: ${typeof window.supabase !== 'undefined'}\n`;
+            debugInfo += `window.supabase.createClient: ${window.supabase && typeof window.supabase.createClient}\n`;
+            debugInfo += `URL: ${SUPABASE_URL}\n`;
+            debugInfo += `Key length: ${SUPABASE_KEY.length}\n`;
+            debugInfo += `User Agent: ${navigator.userAgent}\n`;
+            debugInfo += `Timestamp: ${new Date().toISOString()}`;
+            
+            if (content) content.textContent = debugInfo;
+            if (panel) panel.classList.add('visible');
+        }
+
+        function closeDebug() {
+            const panel = document.getElementById('debug-panel');
+            if (panel) panel.classList.remove('visible');
+            forceStart();
+        }
+
+        // ==========================================
+        // SUPABASE INTEGRACIÓN
+        // ==========================================
+
         async function initSupabase() {
-            const loadingText = document.getElementById('loading-text');
+            updateLoading('Verificando librería...', 'Comprobando que Supabase se cargó correctamente');
             
             try {
-                console.log('Iniciando conexión con Supabase...');
-                
-                // Verificar que el script de Supabase se cargó correctamente
+                // Verificar que la librería se cargó
                 if (typeof window.supabase === 'undefined') {
-                    throw new Error('La librería de Supabase no se cargó correctamente');
+                    throw new Error('La librería de Supabase no se cargó. Verifica tu conexión a internet.');
                 }
 
-                // Crear cliente usando el objeto global correcto
-                // La versión UMD expone supabase en window.supabase
-                const { createClient } = window.supabase;
+                // La librería UMD expone supabase global
+                const supabaseLib = window.supabase;
                 
-                if (!createClient) {
-                    throw new Error('createClient no está disponible en window.supabase');
+                if (!supabaseLib.createClient) {
+                    console.error('window.supabase:', supabaseLib);
+                    throw new Error('createClient no está disponible. Estructura: ' + Object.keys(supabaseLib).join(', '));
                 }
 
-                supabaseClient = createClient(SUPABASE_URL, SUPABASE_KEY, {
+                updateLoading('Creando cliente...', 'Inicializando conexión con Supabase');
+                
+                // Crear cliente
+                supabaseClient = supabaseLib.createClient(SUPABASE_URL, SUPABASE_KEY, {
                     auth: {
                         autoRefreshToken: true,
                         persistSession: true
@@ -1132,90 +1321,57 @@
                     }
                 });
 
-                console.log('Cliente creado, verificando conexión...');
-                loadingText.textContent = 'Verificando conexión...';
-
-                // Verificar conexión con timeout
-                const timeoutPromise = new Promise((_, reject) => 
-                    setTimeout(() => reject(new Error('Timeout')), 10000)
-                );
-                
-                const checkPromise = supabaseClient
-                    .from('task_status')
-                    .select('count', { count: 'exact', head: true });
-
-                const { error } = await Promise.race([checkPromise, timeoutPromise]);
-
-                if (error) {
-                    console.warn('Error verificando tabla:', error);
-                    if (error.code === 'PGRST116') {
-                        // Tabla no existe
-                        loadingText.textContent = 'Creando tabla...';
-                        await createTable();
-                    } else {
-                        throw error;
-                    }
+                if (!supabaseClient) {
+                    throw new Error('No se pudo crear el cliente de Supabase');
                 }
 
+                updateLoading('Verificando conexión...', 'Haciendo ping al servidor');
+                
+                // Test simple de conectividad con timeout
+                const testConnection = async () => {
+                    const startTime = Date.now();
+                    const { data, error } = await supabaseClient
+                        .from('task_status')
+                        .select('count', { count: 'exact', head: true });
+                    
+                    if (error) throw error;
+                    return Date.now() - startTime;
+                };
+
+                // Timeout de 8 segundos
+                const timeoutPromise = new Promise((_, reject) => 
+                    setTimeout(() => reject(new Error('Timeout - El servidor no respondió a tiempo')), 8000)
+                );
+                
+                const pingTime = await Promise.race([testConnection(), timeoutPromise]);
+                
+                updateLoading('Conectado!', `Ping: ${pingTime}ms`);
                 isOnline = true;
                 supabaseInitialized = true;
+                
+                // Cargar datos
+                await loadTaskStatusFromSupabase();
+                
+                // Setup realtime
+                setupRealtimeSubscription();
+                
                 updateConnectionStatus('online', 'Conectado');
                 showToast('Conectado a Supabase correctamente', 'success');
                 
-                // Cargar datos iniciales
-                await loadTaskStatusFromSupabase();
-                
-                // Configurar suscripción en tiempo real
-                setupRealtimeSubscription();
+                setTimeout(hideLoading, 500);
                 
             } catch (err) {
-                console.error('Error inicializando Supabase:', err);
-                updateConnectionStatus('offline', 'Modo Offline');
-                showToast('Usando modo offline - Los datos se guardarán localmente', 'info');
-                
-                // Cargar desde localStorage
-                loadFromLocalStorage();
-            } finally {
-                // SIEMPRE ocultar el loading, haya error o no
-                hideLoading();
+                console.error('Error completo:', err);
+                showLoadingError(err);
+                showDebug(err);
             }
-        }
-
-        async function createTable() {
-            // Intentar crear la tabla usando RPC (si existe la función) o insertar un registro de prueba
-            try {
-                // Intentar insertar un registro de prueba para crear la tabla automáticamente
-                const { error } = await supabaseClient
-                    .from('task_status')
-                    .insert([{ task_id: -1, status: 'pending', updated_at: new Date().toISOString() }])
-                    .select();
-                
-                if (error && error.code !== '23505') { // Ignorar error de duplicado
-                    console.warn('No se pudo crear la tabla automáticamente:', error);
-                    showToast('Por favor crea la tabla manualmente en Supabase', 'error');
-                } else {
-                    // Eliminar el registro de prueba
-                    await supabaseClient.from('task_status').delete().eq('task_id', -1);
-                }
-            } catch (e) {
-                console.warn('Error creando tabla:', e);
-            }
-        }
-
-        function hideLoading() {
-            const overlay = document.getElementById('loading-overlay');
-            overlay.classList.add('hidden');
-            setTimeout(() => {
-                overlay.style.display = 'none';
-            }, 500);
         }
 
         function updateConnectionStatus(status, text) {
-            const statusEl = document.getElementById('connection-status');
-            const textEl = document.getElementById('connection-text');
-            
-            statusEl.className = `connection-status ${status}`;
-            textEl.textContent = text;
+            if (connectionStatus && connectionText) {
+                connectionStatus.className = `connection-status ${status}`;
+                connectionText.textContent = text;
+            }
         }
 
         function setupRealtimeSubscription() {
@@ -1232,16 +1388,13 @@
                         }
                     )
                     .subscribe((status) => {
-                        console.log('Estado de suscripción:', status);
+                        console.log('Estado realtime:', status);
                         if (status === 'SUBSCRIBED') {
                             updateConnectionStatus('online', 'Sincronizado');
-                        } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
-                            updateConnectionStatus('offline', 'Desconectado');
-                            isOnline = false;
                         }
                     });
             } catch (err) {
-                console.error('Error configurando realtime:', err);
+                console.error('Error realtime:', err);
             }
         }
 
@@ -1256,28 +1409,37 @@
         }
 
         // ==========================================
-        // OPERACIONES CRUD CON SUPABASE
+        // OPERACIONES CRUD
         // ==========================================
 
         async function loadTaskStatusFromSupabase() {
+            updateLoading('Cargando datos...', 'Descargando estados de tareas');
+            
             try {
                 const { data, error } = await supabaseClient
                     .from('task_status')
                     .select('*');
 
-                if (error) throw error;
+                if (error) {
+                    // Si la tabla no existe, error específico
+                    if (error.code === '42P01' || error.message.includes('does not exist')) {
+                        throw new Error('La tabla "task_status" no existe en Supabase. Por favor créala primero.');
+                    }
+                    throw error;
+                }
 
-                // Convertir array a objeto
                 taskStatus = {};
-                if (data && data.length > 0) {
+                if (data && Array.isArray(data)) {
                     data.forEach(record => {
-                        taskStatus[record.task_id] = record.status;
+                        if (record && typeof record.task_id !== 'undefined') {
+                            taskStatus[record.task_id] = record.status;
+                        }
                     });
                 }
 
-                console.log('Datos cargados desde Supabase:', Object.keys(taskStatus).length, 'tareas');
+                console.log('Datos cargados:', Object.keys(taskStatus).length, 'tareas');
                 
-                // Actualizar UI
+                // Renderizar con los datos de Supabase
                 renderSchedule();
                 updateStats();
                 updateCharts();
@@ -1289,14 +1451,11 @@
         }
 
         async function saveTaskStatusToSupabase(taskId, status) {
-            // Actualizar localmente primero (optimistic update)
             taskStatus[taskId] = status;
-            
-            // Guardar en localStorage como backup
             saveToLocalStorage();
 
             if (!isOnline || !supabaseClient) {
-                showToast('Cambio guardado localmente (offline)', 'info');
+                showToast('Guardado localmente (offline)', 'info');
                 return;
             }
 
@@ -1313,10 +1472,10 @@
 
                 if (error) throw error;
                 
-                showToast('Estado sincronizado con la nube', 'success');
+                showToast('Sincronizado con la nube', 'success');
             } catch (err) {
-                console.error('Error guardando en Supabase:', err);
-                showToast('Error al sincronizar - guardado localmente', 'error');
+                console.error('Error guardando:', err);
+                showToast('Error al sincronizar - guardado local', 'error');
                 isOnline = false;
                 updateConnectionStatus('offline', 'Error de sync');
             }
@@ -1329,11 +1488,10 @@
             }
 
             const btn = document.getElementById('sync-btn');
-            btn.classList.add('syncing');
+            if (btn) btn.classList.add('syncing');
             updateConnectionStatus('syncing', 'Sincronizando...');
 
             try {
-                // Subir todos los cambios locales
                 const updates = Object.entries(taskStatus).map(([task_id, status]) => ({
                     task_id: parseInt(task_id),
                     status: status,
@@ -1348,55 +1506,49 @@
                     if (error) throw error;
                 }
 
-                // Recargar datos
                 await loadTaskStatusFromSupabase();
                 
                 isOnline = true;
                 showToast('Sincronización completada', 'success');
                 updateConnectionStatus('online', 'Sincronizado');
             } catch (err) {
-                console.error('Error en sincronización:', err);
+                console.error('Error sync:', err);
                 showToast('Error al sincronizar', 'error');
                 updateConnectionStatus('offline', 'Error');
                 isOnline = false;
             } finally {
-                btn.classList.remove('syncing');
+                if (btn) btn.classList.remove('syncing');
             }
         }
 
         // ==========================================
-        // LOCALSTORAGE BACKUP
+        // LOCALSTORAGE
         // ==========================================
 
         function saveToLocalStorage() {
             try {
-                localStorage.setItem('maintenance_task_status', JSON.stringify(taskStatus));
+                localStorage.setItem('maintenance_task_status_v2', JSON.stringify(taskStatus));
                 localStorage.setItem('maintenance_last_sync', new Date().toISOString());
             } catch (e) {
-                console.warn('Error guardando en localStorage:', e);
+                console.warn('Error localStorage:', e);
             }
         }
 
         function loadFromLocalStorage() {
             try {
-                const saved = localStorage.getItem('maintenance_task_status');
+                const saved = localStorage.getItem('maintenance_task_status_v2');
                 if (saved) {
                     taskStatus = JSON.parse(saved);
-                    console.log('Datos cargados desde localStorage:', Object.keys(taskStatus).length, 'tareas');
+                    console.log('LocalStorage:', Object.keys(taskStatus).length, 'tareas');
                 }
             } catch (e) {
-                console.warn('Error cargando desde localStorage:', e);
+                console.warn('Error cargando localStorage:', e);
                 taskStatus = {};
             }
-            
-            // Renderizar independientemente de si había datos o no
-            renderSchedule();
-            updateStats();
-            updateCharts();
         }
 
         // ==========================================
-        // LÓGICA DEL CRONOGRAMA (ORIGINAL)
+        // LÓGICA DEL CRONOGRAMA
         // ==========================================
 
         function splitArrayInHalf(array) {
@@ -1624,11 +1776,13 @@
         }
 
         // ==========================================
-        // RENDERIZADO (ACTUALIZADO CON SUPABASE)
+        // RENDERIZADO
         // ==========================================
 
         function renderSchedule() {
             const container = document.getElementById('schedule-container');
+            if (!container) return;
+            
             container.innerHTML = '';
 
             scheduleData.forEach(bimestre => {
@@ -1865,7 +2019,7 @@
         }
 
         // ==========================================
-        // INTERACCIÓN Y ESTADOS (ACTUALIZADO)
+        // INTERACCIÓN
         // ==========================================
 
         async function toggleStatus(taskId, btn) {
@@ -1874,7 +2028,6 @@
             const currentIndex = states.indexOf(currentState);
             const nextState = states[(currentIndex + 1) % states.length];
             
-            // Actualizar UI inmediatamente
             taskStatus[taskId] = nextState;
             
             const stateText = nextState === 'pending' ? 'Pendiente' : 
@@ -1886,12 +2039,10 @@
             updateStats();
             updateCharts();
             
-            // Guardar en Supabase (async)
             await saveTaskStatusToSupabase(taskId, nextState);
         }
 
         function updateUIForTask(taskId, status) {
-            // Actualizar botón específico sin re-renderizar todo
             const btn = document.querySelector(`button[onclick="toggleStatus(${taskId}, this)"]`);
             if (btn) {
                 const stateText = status === 'pending' ? 'Pendiente' : 
@@ -1936,21 +2087,30 @@
                 });
             });
 
-            animateValue('stat-total', parseInt(document.getElementById('stat-total').innerText) || 0, total, 1000);
-            animateValue('stat-completed', parseInt(document.getElementById('stat-completed').innerText) || 0, completed, 1000);
-            animateValue('stat-progress', parseInt(document.getElementById('stat-progress').innerText) || 0, progress, 1000);
-            animateValue('stat-pending', parseInt(document.getElementById('stat-pending').innerText) || 0, pending, 1000);
+            const statTotal = document.getElementById('stat-total');
+            const statCompleted = document.getElementById('stat-completed');
+            const statProgress = document.getElementById('stat-progress');
+            const statPending = document.getElementById('stat-pending');
+            const statWalter = document.getElementById('stat-walter');
+            const statAdrian = document.getElementById('stat-adrian');
+
+            if (statTotal) animateValue('stat-total', parseInt(statTotal.innerText) || 0, total, 1000);
+            if (statCompleted) animateValue('stat-completed', parseInt(statCompleted.innerText) || 0, completed, 1000);
+            if (statProgress) animateValue('stat-progress', parseInt(statProgress.innerText) || 0, progress, 1000);
+            if (statPending) animateValue('stat-pending', parseInt(statPending.innerText) || 0, pending, 1000);
 
             const walterEff = walterTasks > 0 ? Math.round((walterCompleted / walterTasks) * 100) : 0;
             const adrianEff = adrianTasks > 0 ? Math.round((adrianCompleted / adrianTasks) * 100) : 0;
 
-            document.getElementById('stat-walter').textContent = walterEff + '%';
-            document.getElementById('stat-adrian').textContent = adrianEff + '%';
+            if (statWalter) statWalter.textContent = walterEff + '%';
+            if (statAdrian) statAdrian.textContent = adrianEff + '%';
         }
 
         function animateValue(id, start, end, duration) {
             if (start === end) return;
             const obj = document.getElementById(id);
+            if (!obj) return;
+            
             const range = end - start;
             const minTimer = 50;
             let stepTime = Math.abs(Math.floor(duration / range));
@@ -1975,16 +2135,18 @@
         }
 
         // ==========================================
-        // GRÁFICOS (ORIGINAL)
+        // GRÁFICOS
         // ==========================================
 
         let equipmentChart, bimestreChart, technicianChart, monthDistributionChart;
 
         function initCharts() {
-            const ctx1 = document.getElementById('equipmentChart').getContext('2d');
-            const ctx2 = document.getElementById('bimestreChart').getContext('2d');
-            const ctx3 = document.getElementById('technicianChart').getContext('2d');
-            const ctx4 = document.getElementById('monthDistributionChart').getContext('2d');
+            const ctx1 = document.getElementById('equipmentChart');
+            const ctx2 = document.getElementById('bimestreChart');
+            const ctx3 = document.getElementById('technicianChart');
+            const ctx4 = document.getElementById('monthDistributionChart');
+
+            if (!ctx1 || !ctx2 || !ctx3 || !ctx4) return;
 
             Chart.defaults.color = '#94a3b8';
             Chart.defaults.borderColor = '#334155';
@@ -2074,6 +2236,8 @@
         }
 
         function updateCharts() {
+            if (!bimestreChart) return;
+            
             const bimestreData = [0, 0, 0, 0, 0];
             const pendingData = [0, 0, 0, 0, 0];
             
@@ -2100,14 +2264,14 @@
         }
 
         // ==========================================
-        // UTILIDADES Y FILTROS (ORIGINAL)
+        // UTILIDADES
         // ==========================================
 
         function applyFilters() {
-            const bimestre = document.getElementById('filter-bimestre').value;
-            const tech = document.getElementById('filter-tech').value;
-            const location = document.getElementById('filter-location').value;
-            const status = document.getElementById('filter-status').value;
+            const bimestre = document.getElementById('filter-bimestre')?.value;
+            const tech = document.getElementById('filter-tech')?.value;
+            const location = document.getElementById('filter-location')?.value;
+            const status = document.getElementById('filter-status')?.value;
 
             document.querySelectorAll('.bimestre-section').forEach(section => {
                 const bimestreId = section.dataset.bimestre;
@@ -2142,7 +2306,7 @@
                         let hasStatus = false;
                         equipments.forEach(eq => {
                             const btn = eq.querySelector('.status-toggle');
-                            if (btn.classList.contains(`status-${status}`)) hasStatus = true;
+                            if (btn && btn.classList.contains(`status-${status}`)) hasStatus = true;
                         });
                         card.style.display = hasStatus ? 'block' : 'none';
                     }
@@ -2153,6 +2317,8 @@
         function toggleDashboard() {
             const dashboard = document.getElementById('dashboard');
             const btnText = document.getElementById('dashboard-toggle-text');
+            
+            if (!dashboard || !btnText) return;
             
             dashboard.classList.toggle('minimized');
             
@@ -2186,12 +2352,14 @@
             const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
             const link = document.createElement('a');
             link.href = URL.createObjectURL(blob);
-            link.download = 'cronograma_mantenimiento_2026_adrian_domingos.csv';
+            link.download = 'cronograma_mantenimiento_2026.csv';
             link.click();
         }
 
         function showToast(message, type = 'info') {
             const container = document.getElementById('toast-container');
+            if (!container) return;
+            
             const toast = document.createElement('div');
             toast.className = `toast ${type}`;
             
@@ -2212,36 +2380,43 @@
         }
 
         // ==========================================
-        // INICIALIZACIÓN
+        // INICIALIZACIÓN PRINCIPAL
         // ==========================================
 
         document.addEventListener('DOMContentLoaded', () => {
-            // Generar cronograma primero
+            console.log('DOM cargado, iniciando...');
+            
+            // Inicializar referencias DOM
+            initDOMReferences();
+            
+            // Generar cronograma
             scheduleData = generateSchedule();
             
-            // Intentar cargar desde localStorage mientras se conecta a Supabase
+            // Cargar datos locales primero
             loadFromLocalStorage();
             
-            // Inicializar gráficos
+            // Renderizar inmediatamente (offline first)
+            renderSchedule();
+            updateStats();
             initCharts();
+            updateCharts();
             
-            // Conectar con Supabase (con timeout de seguridad)
+            // Intentar conectar con Supabase después
             setTimeout(() => {
                 initSupabase();
-            }, 100);
+            }, 500);
             
-            // Timeout de seguridad: si después de 15 segundos no se ocultó el loading, ocultarlo
+            // Timeout de seguridad absoluto: 20 segundos
             setTimeout(() => {
                 const overlay = document.getElementById('loading-overlay');
-                if (!overlay.classList.contains('hidden')) {
-                    console.warn('Timeout de seguridad activado - ocultando loading');
-                    hideLoading();
-                    showToast('La aplicación está lista (modo offline)', 'info');
+                if (overlay && !overlay.classList.contains('hidden')) {
+                    console.warn('Timeout absoluto activado');
+                    showLoadingError(new Error('Timeout - La conexión está tomando demasiado tiempo'));
+                    showDebug(new Error('Timeout después de 20 segundos. Posibles causas:\n1. Problema de red\n2. Proyecto de Supabase pausado\n3. Tabla no creada\n4. Error en credenciales'));
                 }
-            }, 15000);
+            }, 20000);
         });
 
-        // Guardar antes de cerrar la página
         window.addEventListener('beforeunload', () => {
             saveToLocalStorage();
         });
