@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Cronograma de Mantenimiento Preventivo 2026 - Candelaria/Terrazas</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Supabase Client CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         * {
             margin: 0;
@@ -100,6 +102,53 @@
 
         .btn-toggle:hover {
             background: var(--border);
+        }
+
+        .btn-sync {
+            background: linear-gradient(135deg, #3ecf8e, #2aa876);
+            color: white;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn-sync.syncing {
+            animation: pulse 1.5s infinite;
+        }
+
+        .connection-status {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem 1rem;
+            border-radius: 0.5rem;
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+
+        .connection-status.online {
+            background: rgba(76, 175, 80, 0.2);
+            color: #4caf50;
+            border: 1px solid rgba(76, 175, 80, 0.3);
+        }
+
+        .connection-status.offline {
+            background: rgba(244, 67, 54, 0.2);
+            color: #f44336;
+            border: 1px solid rgba(244, 67, 54, 0.3);
+        }
+
+        .connection-status.syncing {
+            background: rgba(255, 152, 0, 0.2);
+            color: #ff9800;
+            border: 1px solid rgba(255, 152, 0, 0.3);
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: currentColor;
+            animation: pulse 2s infinite;
         }
 
         /* Dashboard */
@@ -207,6 +256,11 @@
         @keyframes fadeIn {
             from { opacity: 0; transform: translateY(20px); }
             to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
         }
 
         .bimestre-header {
@@ -648,6 +702,84 @@
             border-color: var(--accent);
         }
 
+        /* Loading Overlay */
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(15, 23, 42, 0.95);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+            transition: opacity 0.5s ease;
+        }
+
+        .loading-overlay.hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .loading-spinner {
+            width: 60px;
+            height: 60px;
+            border: 4px solid var(--border);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .loading-text {
+            margin-top: 1rem;
+            color: var(--text-secondary);
+            font-size: 1.1rem;
+        }
+
+        /* Toast Notifications */
+        .toast-container {
+            position: fixed;
+            bottom: 2rem;
+            right: 2rem;
+            z-index: 9998;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .toast {
+            padding: 1rem 1.5rem;
+            border-radius: 0.5rem;
+            color: white;
+            font-weight: 500;
+            animation: slideIn 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        .toast.success { background: var(--success); }
+        .toast.error { background: var(--danger); }
+        .toast.info { background: var(--accent); }
+
         /* Responsive */
         @media (max-width: 1024px) {
             .months-comparison {
@@ -723,9 +855,25 @@
 </head>
 <body>
 
+    <!-- Loading Overlay -->
+    <div id="loading-overlay" class="loading-overlay">
+        <div class="loading-spinner"></div>
+        <div class="loading-text">Conectando con Supabase...</div>
+    </div>
+
+    <!-- Toast Container -->
+    <div id="toast-container" class="toast-container"></div>
+
     <header class="header">
         <h1>🔧Cronograma de Mantenimiento Preventivo 2026</h1>
         <div class="header-controls">
+            <div id="connection-status" class="connection-status offline">
+                <span class="status-dot"></span>
+                <span id="connection-text">Desconectado</span>
+            </div>
+            <button class="btn btn-sync" onclick="syncWithSupabase()" id="sync-btn">
+                🔄 Sincronizar
+            </button>
             <button class="btn btn-toggle" onclick="toggleDashboard()">
                 <span id="dashboard-toggle-text">📊 Minimizar Dashboard</span>
             </button>
@@ -868,7 +1016,18 @@
     </div>
 
     <script>
-        // Configuración
+        // ==========================================
+        // CONFIGURACIÓN SUPABASE
+        // ==========================================
+        const SUPABASE_URL = 'https://yrtyaaygeselccbdimuq.supabase.co';
+        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlydHlhYXlnZXNlbGNjYmRpbXVxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI0NjA3NzMsImV4cCI6MjA4ODAzNjc3M30.CetuY3lmy9hmsNES9owfWXlW8zk9FPEnLSlXzyHBjas';
+        
+        let supabase;
+        let realtimeChannel;
+
+        // ==========================================
+        // CONFIGURACIÓN APLICACIÓN
+        // ==========================================
         const config = {
             year: 2026,
             shifts: {
@@ -935,8 +1094,217 @@
         let taskStatus = {};
         let scheduleData = [];
         let equipmentRotation = {};
+        let isOnline = false;
 
-        // Dividir array en dos partes iguales
+        // ==========================================
+        // INICIALIZACIÓN SUPABASE
+        // ==========================================
+        
+        async function initSupabase() {
+            try {
+                // Crear cliente Supabase desde el objeto global
+                const { createClient } = window.supabase;
+                supabase = createClient(SUPABASE_URL, SUPABASE_KEY, {
+                    realtime: {
+                        params: {
+                            eventsPerSecond: 10
+                        }
+                    }
+                });
+
+                // Verificar conexión
+                const { data, error } = await supabase.from('task_status').select('count', { count: 'exact' }).limit(1);
+                
+                if (error) {
+                    console.warn('Error verificando conexión:', error);
+                    updateConnectionStatus('offline', 'Error de conexión');
+                    showToast('Modo offline activado - Los cambios se guardarán localmente', 'info');
+                } else {
+                    isOnline = true;
+                    updateConnectionStatus('online', 'Conectado');
+                    showToast('Conectado a Supabase correctamente', 'success');
+                    
+                    // Cargar datos iniciales
+                    await loadTaskStatusFromSupabase();
+                    
+                    // Configurar suscripción en tiempo real
+                    setupRealtimeSubscription();
+                }
+            } catch (err) {
+                console.error('Error inicializando Supabase:', err);
+                updateConnectionStatus('offline', 'Desconectado');
+                showToast('Error al conectar con Supabase', 'error');
+            } finally {
+                document.getElementById('loading-overlay').classList.add('hidden');
+            }
+        }
+
+        function updateConnectionStatus(status, text) {
+            const statusEl = document.getElementById('connection-status');
+            const textEl = document.getElementById('connection-text');
+            
+            statusEl.className = `connection-status ${status}`;
+            textEl.textContent = text;
+        }
+
+        function setupRealtimeSubscription() {
+            if (!supabase) return;
+
+            realtimeChannel = supabase
+                .channel('task_status_changes')
+                .on('postgres_changes', 
+                    { event: '*', schema: 'public', table: 'task_status' },
+                    (payload) => {
+                        console.log('Cambio recibido:', payload);
+                        handleRealtimeChange(payload);
+                    }
+                )
+                .subscribe((status) => {
+                    console.log('Estado de suscripción:', status);
+                    if (status === 'SUBSCRIBED') {
+                        updateConnectionStatus('online', 'Sincronizado');
+                    }
+                });
+        }
+
+        function handleRealtimeChange(payload) {
+            if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
+                const { task_id, status } = payload.new;
+                taskStatus[task_id] = status;
+                updateUIForTask(task_id, status);
+                updateStats();
+                updateCharts();
+            }
+        }
+
+        // ==========================================
+        // OPERACIONES CRUD CON SUPABASE
+        // ==========================================
+
+        async function loadTaskStatusFromSupabase() {
+            try {
+                const { data, error } = await supabase
+                    .from('task_status')
+                    .select('*');
+
+                if (error) throw error;
+
+                // Convertir array a objeto
+                taskStatus = {};
+                data.forEach(record => {
+                    taskStatus[record.task_id] = record.status;
+                });
+
+                console.log('Datos cargados desde Supabase:', Object.keys(taskStatus).length, 'tareas');
+                
+                // Actualizar UI
+                renderSchedule();
+                updateStats();
+                updateCharts();
+                
+            } catch (err) {
+                console.error('Error cargando datos:', err);
+                // Cargar desde localStorage como fallback
+                loadFromLocalStorage();
+            }
+        }
+
+        async function saveTaskStatusToSupabase(taskId, status) {
+            // Actualizar localmente primero (optimistic update)
+            taskStatus[taskId] = status;
+            
+            // Guardar en localStorage como backup
+            saveToLocalStorage();
+
+            if (!isOnline || !supabase) {
+                showToast('Cambio guardado localmente (offline)', 'info');
+                return;
+            }
+
+            try {
+                const { error } = await supabase
+                    .from('task_status')
+                    .upsert({ 
+                        task_id: taskId, 
+                        status: status,
+                        updated_at: new Date().toISOString()
+                    }, { 
+                        onConflict: 'task_id' 
+                    });
+
+                if (error) throw error;
+                
+                showToast('Estado sincronizado con la nube', 'success');
+            } catch (err) {
+                console.error('Error guardando en Supabase:', err);
+                showToast('Error al sincronizar - guardado localmente', 'error');
+            }
+        }
+
+        async function syncWithSupabase() {
+            if (!supabase) {
+                showToast('No hay conexión con Supabase', 'error');
+                return;
+            }
+
+            const btn = document.getElementById('sync-btn');
+            btn.classList.add('syncing');
+            updateConnectionStatus('syncing', 'Sincronizando...');
+
+            try {
+                // Subir todos los cambios locales
+                const updates = Object.entries(taskStatus).map(([task_id, status]) => ({
+                    task_id: parseInt(task_id),
+                    status: status,
+                    updated_at: new Date().toISOString()
+                }));
+
+                if (updates.length > 0) {
+                    const { error } = await supabase
+                        .from('task_status')
+                        .upsert(updates, { onConflict: 'task_id' });
+
+                    if (error) throw error;
+                }
+
+                // Recargar datos
+                await loadTaskStatusFromSupabase();
+                
+                showToast('Sincronización completada', 'success');
+                updateConnectionStatus('online', 'Sincronizado');
+            } catch (err) {
+                console.error('Error en sincronización:', err);
+                showToast('Error al sincronizar', 'error');
+                updateConnectionStatus('offline', 'Error');
+            } finally {
+                btn.classList.remove('syncing');
+            }
+        }
+
+        // ==========================================
+        // LOCALSTORAGE BACKUP
+        // ==========================================
+
+        function saveToLocalStorage() {
+            localStorage.setItem('maintenance_task_status', JSON.stringify(taskStatus));
+            localStorage.setItem('maintenance_last_sync', new Date().toISOString());
+        }
+
+        function loadFromLocalStorage() {
+            const saved = localStorage.getItem('maintenance_task_status');
+            if (saved) {
+                taskStatus = JSON.parse(saved);
+                console.log('Datos cargados desde localStorage');
+                renderSchedule();
+                updateStats();
+                updateCharts();
+            }
+        }
+
+        // ==========================================
+        // LÓGICA DEL CRONOGRAMA (ORIGINAL)
+        // ==========================================
+
         function splitArrayInHalf(array) {
             const mid = Math.ceil(array.length / 2);
             return {
@@ -945,7 +1313,6 @@
             };
         }
 
-        // Generar cronograma bimestral con distribución equilibrada incluyendo domingos de Adrián
         function generateSchedule() {
             const bimestres = [
                 { id: 0, months: [2, 3], name: 'Marzo - Abril' },
@@ -965,11 +1332,9 @@
                     months: []
                 };
 
-                // Dividir equipos en dos mitades para distribución entre meses
                 const candelariaSplit = splitArrayInHalf([...candelariaEquipment]);
                 const terrazasSplit = splitArrayInHalf([...terrazasEquipment]);
 
-                // Reiniciar rotación de equipos para cada bimestre
                 equipmentRotation[bimestre.id] = {
                     month1: {
                         candelaria: candelariaSplit.first,
@@ -994,7 +1359,6 @@
                         isFirstMonth: isFirstMonth
                     };
 
-                    // Obtener días trabajables (viernes, sábado, domingo)
                     const daysInMonth = new Date(2026, monthNum + 1, 0).getDate();
                     const workingDays = [];
                     
@@ -1016,24 +1380,15 @@
                         }
                     }
 
-                    // Determinar en qué mes va Terrazas (alternar entre bimestres)
                     const terrazasInFirstMonth = bimestre.id % 2 === 0;
                     const assignTerrazasThisMonth = isFirstMonth === terrazasInFirstMonth;
 
-                    // Distribuir equipos entre los días del mes de manera equilibrada
-                    // Calcular cuántos días tiene cada técnico
-                    const fridays = workingDays.filter(d => d.isFriday);
-                    const saturdays = workingDays.filter(d => d.isSaturday);
-                    const sundays = workingDays.filter(d => d.isSunday);
-
-                    // Asignar equipos a cada día
                     workingDays.forEach((day) => {
                         const dayShifts = {
                             date: day,
                             shifts: []
                         };
 
-                        // Si es domingo de Terrazas (una sola vez por bimestre)
                         if (day.isSunday && assignTerrazasThisMonth && !equipmentRotation[bimestre.id].terrazasAssigned) {
                             const rotation = isFirstMonth ? equipmentRotation[bimestre.id].month1 : equipmentRotation[bimestre.id].month2;
                             const terrazasEquip = selectEquipmentsForTerrazas(rotation);
@@ -1053,7 +1408,6 @@
                                 equipmentRotation[bimestre.id].terrazasAssigned = true;
                             }
                             
-                            // También asignar turno de Adrián en Candelaria el mismo domingo (diferente horario)
                             const rotationAdrian = isFirstMonth ? equipmentRotation[bimestre.id].month1 : equipmentRotation[bimestre.id].month2;
                             const adrianEquip = selectEquipmentsForCandelaria(rotationAdrian, 3);
                             
@@ -1071,7 +1425,6 @@
                                 });
                             }
                         } else if (day.isSunday) {
-                            // Domingos sin Terrazas: solo Adrián en Candelaria
                             const rotation = isFirstMonth ? equipmentRotation[bimestre.id].month1 : equipmentRotation[bimestre.id].month2;
                             const adrianEquip = selectEquipmentsForCandelaria(rotation, 3);
                             
@@ -1089,10 +1442,8 @@
                                 });
                             }
                         } else {
-                            // Viernes y Sábados: Candelaria con turnos alternados
                             const rotation = isFirstMonth ? equipmentRotation[bimestre.id].month1 : equipmentRotation[bimestre.id].month2;
                             
-                            // Turno Mañana - Walter
                             const morningEquip = selectEquipmentsForCandelaria(rotation, 3);
                             if (morningEquip.length > 0) {
                                 dayShifts.shifts.push({
@@ -1108,7 +1459,6 @@
                                 });
                             }
 
-                            // Turno Noche - Adrián
                             const nightEquip = selectEquipmentsForCandelaria(rotation, 3);
                             if (nightEquip.length > 0) {
                                 dayShifts.shifts.push({
@@ -1179,7 +1529,10 @@
             return selected;
         }
 
-        // Renderizar cronograma
+        // ==========================================
+        // RENDERIZADO (ACTUALIZADO CON SUPABASE)
+        // ==========================================
+
         function renderSchedule() {
             const container = document.getElementById('schedule-container');
             container.innerHTML = '';
@@ -1189,7 +1542,6 @@
                 bimestreDiv.className = 'bimestre-section';
                 bimestreDiv.dataset.bimestre = bimestre.id;
 
-                // Header del bimestre
                 const header = document.createElement('div');
                 header.className = 'bimestre-header';
                 
@@ -1243,7 +1595,6 @@
 
                 bimestreDiv.appendChild(header);
 
-                // Aviso especial
                 const terrazasMonth = bimestre.id % 2 === 0 ? 'primer' : 'segundo';
                 const specialNotice = document.createElement('div');
                 specialNotice.className = 'special-notice';
@@ -1256,7 +1607,6 @@
                 `;
                 bimestreDiv.appendChild(specialNotice);
 
-                // Comparación de meses
                 const monthsComparison = document.createElement('div');
                 monthsComparison.className = 'months-comparison';
 
@@ -1302,7 +1652,6 @@
 
                 bimestreDiv.appendChild(monthsComparison);
 
-                // Info de rotación
                 const rotationInfo = document.createElement('div');
                 rotationInfo.className = 'rotation-info';
                 
@@ -1421,13 +1770,17 @@
             `;
         }
 
-        // Toggle estado
-        function toggleStatus(taskId, btn) {
+        // ==========================================
+        // INTERACCIÓN Y ESTADOS (ACTUALIZADO)
+        // ==========================================
+
+        async function toggleStatus(taskId, btn) {
             const states = ['pending', 'progress', 'completed'];
             const currentState = taskStatus[taskId] || 'pending';
             const currentIndex = states.indexOf(currentState);
             const nextState = states[(currentIndex + 1) % states.length];
             
+            // Actualizar UI inmediatamente
             taskStatus[taskId] = nextState;
             
             const stateText = nextState === 'pending' ? 'Pendiente' : 
@@ -1438,9 +1791,22 @@
             
             updateStats();
             updateCharts();
+            
+            // Guardar en Supabase (async)
+            await saveTaskStatusToSupabase(taskId, nextState);
         }
 
-        // Actualizar estadísticas
+        function updateUIForTask(taskId, status) {
+            // Actualizar botón específico sin re-renderizar todo
+            const btn = document.querySelector(`button[onclick="toggleStatus(${taskId}, this)"]`);
+            if (btn) {
+                const stateText = status === 'pending' ? 'Pendiente' : 
+                                 status === 'progress' ? 'En Proceso' : 'Culminado';
+                btn.className = `status-toggle status-${status}`;
+                btn.textContent = stateText;
+            }
+        }
+
         function updateStats() {
             let total = 0;
             let completed = 0;
@@ -1514,7 +1880,10 @@
             run();
         }
 
-        // Gráficos
+        // ==========================================
+        // GRÁFICOS (ORIGINAL)
+        // ==========================================
+
         let equipmentChart, bimestreChart, technicianChart, monthDistributionChart;
 
         function initCharts() {
@@ -1636,7 +2005,10 @@
             bimestreChart.update();
         }
 
-        // Filtros
+        // ==========================================
+        // UTILIDADES Y FILTROS (ORIGINAL)
+        // ==========================================
+
         function applyFilters() {
             const bimestre = document.getElementById('filter-bimestre').value;
             const tech = document.getElementById('filter-tech').value;
@@ -1724,24 +2096,49 @@
             link.click();
         }
 
-        // Inicialización
-        document.addEventListener('DOMContentLoaded', () => {
-            scheduleData = generateSchedule();
-            renderSchedule();
-            initCharts();
-        });
-    
-    </script>
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            
+            const icons = {
+                success: '✓',
+                error: '✕',
+                info: 'ℹ'
+            };
+            
+            toast.innerHTML = `<span>${icons[type]}</span> ${message}`;
+            container.appendChild(toast);
+            
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                toast.style.transform = 'translateX(100%)';
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
 
+        // ==========================================
+        // INICIALIZACIÓN
+        // ==========================================
+
+        document.addEventListener('DOMContentLoaded', () => {
+            // Generar cronograma primero
+            scheduleData = generateSchedule();
+            
+            // Intentar cargar desde localStorage mientras se conecta a Supabase
+            loadFromLocalStorage();
+            
+            // Inicializar gráficos
+            initCharts();
+            
+            // Conectar con Supabase
+            initSupabase();
+        });
+
+        // Guardar antes de cerrar la página
+        window.addEventListener('beforeunload', () => {
+            saveToLocalStorage();
+        });
+    </script>
 </body>
 </html>
-
-
-
-
-
-
-
-
-
-
