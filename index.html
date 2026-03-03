@@ -5,8 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Cronograma de Mantenimiento Preventivo 2026 - Candelaria/Terrazas</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <!-- Supabase Client CDN -->
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <!-- Supabase Client CDN - Usando la versión UMD correcta -->
+    <script src="https://unpkg.com/@supabase/supabase-js@2.39.0/dist/umd/supabase.js"></script>
     <style>
         * {
             margin: 0;
@@ -858,7 +858,7 @@
     <!-- Loading Overlay -->
     <div id="loading-overlay" class="loading-overlay">
         <div class="loading-spinner"></div>
-        <div class="loading-text">Conectando con Supabase...</div>
+        <div class="loading-text" id="loading-text">Conectando con Supabase...</div>
     </div>
 
     <!-- Toast Container -->
@@ -1022,7 +1022,7 @@
         const SUPABASE_URL = 'https://yrtyaaygeselccbdimuq.supabase.co';
         const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlydHlhYXlnZXNlbGNjYmRpbXVxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI0NjA3NzMsImV4cCI6MjA4ODAzNjc3M30.CetuY3lmy9hmsNES9owfWXlW8zk9FPEnLSlXzyHBjas';
         
-        let supabase;
+        let supabaseClient;
         let realtimeChannel;
 
         // ==========================================
@@ -1095,16 +1095,36 @@
         let scheduleData = [];
         let equipmentRotation = {};
         let isOnline = false;
+        let supabaseInitialized = false;
 
         // ==========================================
-        // INICIALIZACIÓN SUPABASE
+        // INICIALIZACIÓN SUPABASE - CORREGIDA
         // ==========================================
         
         async function initSupabase() {
+            const loadingText = document.getElementById('loading-text');
+            
             try {
-                // Crear cliente Supabase desde el objeto global
+                console.log('Iniciando conexión con Supabase...');
+                
+                // Verificar que el script de Supabase se cargó correctamente
+                if (typeof window.supabase === 'undefined') {
+                    throw new Error('La librería de Supabase no se cargó correctamente');
+                }
+
+                // Crear cliente usando el objeto global correcto
+                // La versión UMD expone supabase en window.supabase
                 const { createClient } = window.supabase;
-                supabase = createClient(SUPABASE_URL, SUPABASE_KEY, {
+                
+                if (!createClient) {
+                    throw new Error('createClient no está disponible en window.supabase');
+                }
+
+                supabaseClient = createClient(SUPABASE_URL, SUPABASE_KEY, {
+                    auth: {
+                        autoRefreshToken: true,
+                        persistSession: true
+                    },
                     realtime: {
                         params: {
                             eventsPerSecond: 10
@@ -1112,31 +1132,82 @@
                     }
                 });
 
-                // Verificar conexión
-                const { data, error } = await supabase.from('task_status').select('count', { count: 'exact' }).limit(1);
+                console.log('Cliente creado, verificando conexión...');
+                loadingText.textContent = 'Verificando conexión...';
+
+                // Verificar conexión con timeout
+                const timeoutPromise = new Promise((_, reject) => 
+                    setTimeout(() => reject(new Error('Timeout')), 10000)
+                );
                 
+                const checkPromise = supabaseClient
+                    .from('task_status')
+                    .select('count', { count: 'exact', head: true });
+
+                const { error } = await Promise.race([checkPromise, timeoutPromise]);
+
                 if (error) {
-                    console.warn('Error verificando conexión:', error);
-                    updateConnectionStatus('offline', 'Error de conexión');
-                    showToast('Modo offline activado - Los cambios se guardarán localmente', 'info');
-                } else {
-                    isOnline = true;
-                    updateConnectionStatus('online', 'Conectado');
-                    showToast('Conectado a Supabase correctamente', 'success');
-                    
-                    // Cargar datos iniciales
-                    await loadTaskStatusFromSupabase();
-                    
-                    // Configurar suscripción en tiempo real
-                    setupRealtimeSubscription();
+                    console.warn('Error verificando tabla:', error);
+                    if (error.code === 'PGRST116') {
+                        // Tabla no existe
+                        loadingText.textContent = 'Creando tabla...';
+                        await createTable();
+                    } else {
+                        throw error;
+                    }
                 }
+
+                isOnline = true;
+                supabaseInitialized = true;
+                updateConnectionStatus('online', 'Conectado');
+                showToast('Conectado a Supabase correctamente', 'success');
+                
+                // Cargar datos iniciales
+                await loadTaskStatusFromSupabase();
+                
+                // Configurar suscripción en tiempo real
+                setupRealtimeSubscription();
+                
             } catch (err) {
                 console.error('Error inicializando Supabase:', err);
-                updateConnectionStatus('offline', 'Desconectado');
-                showToast('Error al conectar con Supabase', 'error');
+                updateConnectionStatus('offline', 'Modo Offline');
+                showToast('Usando modo offline - Los datos se guardarán localmente', 'info');
+                
+                // Cargar desde localStorage
+                loadFromLocalStorage();
             } finally {
-                document.getElementById('loading-overlay').classList.add('hidden');
+                // SIEMPRE ocultar el loading, haya error o no
+                hideLoading();
             }
+        }
+
+        async function createTable() {
+            // Intentar crear la tabla usando RPC (si existe la función) o insertar un registro de prueba
+            try {
+                // Intentar insertar un registro de prueba para crear la tabla automáticamente
+                const { error } = await supabaseClient
+                    .from('task_status')
+                    .insert([{ task_id: -1, status: 'pending', updated_at: new Date().toISOString() }])
+                    .select();
+                
+                if (error && error.code !== '23505') { // Ignorar error de duplicado
+                    console.warn('No se pudo crear la tabla automáticamente:', error);
+                    showToast('Por favor crea la tabla manualmente en Supabase', 'error');
+                } else {
+                    // Eliminar el registro de prueba
+                    await supabaseClient.from('task_status').delete().eq('task_id', -1);
+                }
+            } catch (e) {
+                console.warn('Error creando tabla:', e);
+            }
+        }
+
+        function hideLoading() {
+            const overlay = document.getElementById('loading-overlay');
+            overlay.classList.add('hidden');
+            setTimeout(() => {
+                overlay.style.display = 'none';
+            }, 500);
         }
 
         function updateConnectionStatus(status, text) {
@@ -1148,23 +1219,30 @@
         }
 
         function setupRealtimeSubscription() {
-            if (!supabase) return;
+            if (!supabaseClient || !isOnline) return;
 
-            realtimeChannel = supabase
-                .channel('task_status_changes')
-                .on('postgres_changes', 
-                    { event: '*', schema: 'public', table: 'task_status' },
-                    (payload) => {
-                        console.log('Cambio recibido:', payload);
-                        handleRealtimeChange(payload);
-                    }
-                )
-                .subscribe((status) => {
-                    console.log('Estado de suscripción:', status);
-                    if (status === 'SUBSCRIBED') {
-                        updateConnectionStatus('online', 'Sincronizado');
-                    }
-                });
+            try {
+                realtimeChannel = supabaseClient
+                    .channel('task_status_changes')
+                    .on('postgres_changes', 
+                        { event: '*', schema: 'public', table: 'task_status' },
+                        (payload) => {
+                            console.log('Cambio recibido:', payload);
+                            handleRealtimeChange(payload);
+                        }
+                    )
+                    .subscribe((status) => {
+                        console.log('Estado de suscripción:', status);
+                        if (status === 'SUBSCRIBED') {
+                            updateConnectionStatus('online', 'Sincronizado');
+                        } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
+                            updateConnectionStatus('offline', 'Desconectado');
+                            isOnline = false;
+                        }
+                    });
+            } catch (err) {
+                console.error('Error configurando realtime:', err);
+            }
         }
 
         function handleRealtimeChange(payload) {
@@ -1183,7 +1261,7 @@
 
         async function loadTaskStatusFromSupabase() {
             try {
-                const { data, error } = await supabase
+                const { data, error } = await supabaseClient
                     .from('task_status')
                     .select('*');
 
@@ -1191,9 +1269,11 @@
 
                 // Convertir array a objeto
                 taskStatus = {};
-                data.forEach(record => {
-                    taskStatus[record.task_id] = record.status;
-                });
+                if (data && data.length > 0) {
+                    data.forEach(record => {
+                        taskStatus[record.task_id] = record.status;
+                    });
+                }
 
                 console.log('Datos cargados desde Supabase:', Object.keys(taskStatus).length, 'tareas');
                 
@@ -1204,8 +1284,7 @@
                 
             } catch (err) {
                 console.error('Error cargando datos:', err);
-                // Cargar desde localStorage como fallback
-                loadFromLocalStorage();
+                throw err;
             }
         }
 
@@ -1216,13 +1295,13 @@
             // Guardar en localStorage como backup
             saveToLocalStorage();
 
-            if (!isOnline || !supabase) {
+            if (!isOnline || !supabaseClient) {
                 showToast('Cambio guardado localmente (offline)', 'info');
                 return;
             }
 
             try {
-                const { error } = await supabase
+                const { error } = await supabaseClient
                     .from('task_status')
                     .upsert({ 
                         task_id: taskId, 
@@ -1238,11 +1317,13 @@
             } catch (err) {
                 console.error('Error guardando en Supabase:', err);
                 showToast('Error al sincronizar - guardado localmente', 'error');
+                isOnline = false;
+                updateConnectionStatus('offline', 'Error de sync');
             }
         }
 
         async function syncWithSupabase() {
-            if (!supabase) {
+            if (!supabaseClient) {
                 showToast('No hay conexión con Supabase', 'error');
                 return;
             }
@@ -1260,7 +1341,7 @@
                 }));
 
                 if (updates.length > 0) {
-                    const { error } = await supabase
+                    const { error } = await supabaseClient
                         .from('task_status')
                         .upsert(updates, { onConflict: 'task_id' });
 
@@ -1270,12 +1351,14 @@
                 // Recargar datos
                 await loadTaskStatusFromSupabase();
                 
+                isOnline = true;
                 showToast('Sincronización completada', 'success');
                 updateConnectionStatus('online', 'Sincronizado');
             } catch (err) {
                 console.error('Error en sincronización:', err);
                 showToast('Error al sincronizar', 'error');
                 updateConnectionStatus('offline', 'Error');
+                isOnline = false;
             } finally {
                 btn.classList.remove('syncing');
             }
@@ -1286,19 +1369,30 @@
         // ==========================================
 
         function saveToLocalStorage() {
-            localStorage.setItem('maintenance_task_status', JSON.stringify(taskStatus));
-            localStorage.setItem('maintenance_last_sync', new Date().toISOString());
+            try {
+                localStorage.setItem('maintenance_task_status', JSON.stringify(taskStatus));
+                localStorage.setItem('maintenance_last_sync', new Date().toISOString());
+            } catch (e) {
+                console.warn('Error guardando en localStorage:', e);
+            }
         }
 
         function loadFromLocalStorage() {
-            const saved = localStorage.getItem('maintenance_task_status');
-            if (saved) {
-                taskStatus = JSON.parse(saved);
-                console.log('Datos cargados desde localStorage');
-                renderSchedule();
-                updateStats();
-                updateCharts();
+            try {
+                const saved = localStorage.getItem('maintenance_task_status');
+                if (saved) {
+                    taskStatus = JSON.parse(saved);
+                    console.log('Datos cargados desde localStorage:', Object.keys(taskStatus).length, 'tareas');
+                }
+            } catch (e) {
+                console.warn('Error cargando desde localStorage:', e);
+                taskStatus = {};
             }
+            
+            // Renderizar independientemente de si había datos o no
+            renderSchedule();
+            updateStats();
+            updateCharts();
         }
 
         // ==========================================
@@ -2131,8 +2225,20 @@
             // Inicializar gráficos
             initCharts();
             
-            // Conectar con Supabase
-            initSupabase();
+            // Conectar con Supabase (con timeout de seguridad)
+            setTimeout(() => {
+                initSupabase();
+            }, 100);
+            
+            // Timeout de seguridad: si después de 15 segundos no se ocultó el loading, ocultarlo
+            setTimeout(() => {
+                const overlay = document.getElementById('loading-overlay');
+                if (!overlay.classList.contains('hidden')) {
+                    console.warn('Timeout de seguridad activado - ocultando loading');
+                    hideLoading();
+                    showToast('La aplicación está lista (modo offline)', 'info');
+                }
+            }, 15000);
         });
 
         // Guardar antes de cerrar la página
