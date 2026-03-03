@@ -1731,25 +1731,11 @@
             initCharts();
         });
     
-    // Inicializar Supabase
-const supabaseUrl = 'https://yrtyaaygeselccbdimuq.supabase.co';
-const supabaseKey = 'sb_publishable_vo1BIyAXOM6j6Pxrztys8A_K3qP6yez';
-const supabase = supabase.createClient(supabaseUrl, supabaseKey);
-
-// Función para guardar el cambio cuando hagas clic
-async function saveToDatabase(taskId, newStatus) {
-    const { data, error } = await supabase
-        .from('mantenimiento')
-        .upsert({ task_id: taskId, status: newStatus }, { onConflict: 'task_id' });
-    
-    if (error) console.error("Error guardando:", error);
-}
-      html <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2">
-      html <script> const SUPABASE_URL = 'https://yrtyaaygeselccbdimuq.supabase.co'; const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlydHlhYXlnZXNlbGNjYmRpbXVxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI0NjA3NzMsImV4cCI6MjA4ODAzNjc3M30.CetuY3lmy9hmsNES9owfWXlW8zk9FPEnLSlXzyHBjas'; const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY); 
     </script>
 
 </body>
 </html>
+
 
 
 
